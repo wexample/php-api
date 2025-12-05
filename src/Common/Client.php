@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Wexample\PhpApi\Common;
 
+use Wexample\PhpApi\Const\HttpMethod;
 use function array_merge;
 
 use GuzzleHttp\Client as GuzzleClient;
@@ -82,7 +83,7 @@ class Client
      */
     public function get(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('GET', $path, $options);
+        return $this->request(HttpMethod::GET, $path, $options);
     }
 
     /**
@@ -92,7 +93,7 @@ class Client
      */
     public function post(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('POST', $path, $options);
+        return $this->request(HttpMethod::POST, $path, $options);
     }
 
     /**
@@ -102,7 +103,7 @@ class Client
      */
     public function put(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('PUT', $path, $options);
+        return $this->request(HttpMethod::PUT, $path, $options);
     }
 
     /**
@@ -112,7 +113,7 @@ class Client
      */
     public function patch(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('PATCH', $path, $options);
+        return $this->request(HttpMethod::PATCH, $path, $options);
     }
 
     /**
@@ -122,7 +123,7 @@ class Client
      */
     public function delete(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('DELETE', $path, $options);
+        return $this->request(HttpMethod::DELETE, $path, $options);
     }
 
     /**
