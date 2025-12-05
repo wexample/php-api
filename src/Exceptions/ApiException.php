@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SyrtisClient\Exceptions;
+namespace Wexample\PhpApi\Exceptions;
 
 use Psr\Http\Message\ResponseInterface;
 
