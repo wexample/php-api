@@ -1,6 +1,6 @@
 # wexample/php-api
 
-Version: 1.0.74
+Version: 1.0.75
 
 Various api
 
@@ -130,7 +130,7 @@ Refer to each package's documentation for specific version compatibility require
 ## Dependencies
 
 - php: >=7.4
-- symfony/string: ^6.2|^7.0
+- guzzlehttp/guzzle: ^7.8
 
 
 # About us
