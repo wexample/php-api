@@ -25,7 +25,7 @@ use Wexample\PhpApi\Exceptions\ApiException;
  * $client = new Client('https://api.wexample.com', 'api-key-here');
  * $response = $client->get('/v1/things', ['query' => ['page' => 1]]);
  */
-final class Client
+class Client
 {
     private ClientInterface $httpClient;
     private string $baseUrl;
