@@ -49,9 +49,45 @@ class Client
             'base_uri' => $this->baseUrl,
         ]);
 
-        if ($this->apiKey !== null && $this->apiKey !== '') {
-            $this->defaultHeaders['Authorization'] ??= 'Bearer ' . $this->apiKey;
+        $this->setApiKey($apiKey);
+    }
+
+    public function setApiKey(string $apiKey)
+    {
+        $this->setBearerToken($apiKey);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getDefaultHeaders(): array
+    {
+        return $this->defaultHeaders;
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    public function setDefaultHeaders(array $headers): void
+    {
+        foreach ($headers as $name => $value) {
+            $this->setDefaultHeader($name, $value);
         }
+    }
+
+    public function setDefaultHeader(string $name, string $value): void
+    {
+        $this->defaultHeaders[$name] = $value;
+    }
+
+    public function removeDefaultHeader(string $name): void
+    {
+        unset($this->defaultHeaders[$name]);
+    }
+
+    public function setBearerToken(string $token): void
+    {
+        $this->setDefaultHeader('Authorization', 'Bearer ' . $token);
     }
 
     protected function requestJson(string $method, string $path, array $options = []): array

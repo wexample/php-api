@@ -6,6 +6,7 @@ Various api
 
 ## Table of Contents
 
+- [Usage](#usage)
 - [Api Reference](#api-reference)
 - [Code Quality](#code-quality)
 - [Versioning](#versioning)
@@ -21,6 +22,25 @@ Various api
 - [Compatibility Matrix](#compatibility-matrix)
 - [Dependencies](#dependencies)
 - [Suite Signature](#suite-signature)
+
+## Usage
+
+```php
+use Wexample\PhpApi\Common\Client;
+
+$client = new Client('https://api.syrtis.ai');
+
+// Add headers you want sent with every request.
+$client->setBearerToken('your-api-token');
+$client->setDefaultHeader('X-Requested-With', 'syrtis-client');
+
+// Per-request headers can also be provided via the $options argument.
+$response = $client->get('/v1/resources', [
+    'headers' => [
+        'X-Debug' => 'true',
+    ],
+]);
+```
 
 
 ## API Reference
@@ -140,4 +160,3 @@ Refer to each package's documentation for specific version compatibility require
 This packages suite embodies this spirit. Trusted by professionals and enthusiasts alike, it delivers a consistent, high-quality foundation for modern development — open, elegant, and battle-tested. Its reputation is built on years of collaboration, refinement, and rigorous attention to detail, making it a natural choice for those who demand both robustness and beauty in their tools.
 
 Wexample cultivates a culture of mastery. Each package, each contribution carries the mark of a community that values precision, ethics, and innovation — a community proud to shape the future of digital craftsmanship.
-
