@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+namespace Wexample\PhpApi;
 
 use function array_merge;
 
@@ -27,6 +28,7 @@ use Wexample\PhpApi\Exceptions\ApiException;
 final class Client
 {
     private ClientInterface $httpClient;
+    private string $baseUrl;
 
     /**
      * @param string $baseUrl Base URL for the  API, e.g. https://api.syrtis.ai.
@@ -35,15 +37,15 @@ final class Client
      * @param array<string, string> $defaultHeaders Extra headers sent with every request.
      */
     public function __construct(
-        private readonly string $baseUrl,
+        string $baseUrl,
         private readonly ?string $apiKey = null,
         ?ClientInterface $httpClient = null,
         private array $defaultHeaders = [],
     ) {
-        $normalizedBaseUrl = rtrim($baseUrl, '/') . '/';
+        $this->baseUrl = rtrim($baseUrl, '/') . '/';
 
         $this->httpClient = $httpClient ?? new GuzzleClient([
-            'base_uri' => $normalizedBaseUrl,
+            'base_uri' => $this->baseUrl,
         ]);
 
         if ($this->apiKey !== null && $this->apiKey !== '') {
