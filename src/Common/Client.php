@@ -39,7 +39,7 @@ class Client
      */
     public function __construct(
         string $baseUrl,
-        private readonly ?string $apiKey = null,
+        readonly ?string $apiKey = null,
         ?ClientInterface $httpClient = null,
         private array $defaultHeaders = [],
     ) {
