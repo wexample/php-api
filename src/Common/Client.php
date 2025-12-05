@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wexample\PhpApi;
+namespace Wexample\PhpApi\Common;
 
 use function array_merge;
 
@@ -51,6 +51,28 @@ class Client
         if ($this->apiKey !== null && $this->apiKey !== '') {
             $this->defaultHeaders['Authorization'] ??= 'Bearer ' . $this->apiKey;
         }
+    }
+
+    protected function requestJson(string $method, string $path, array $options = []): array
+    {
+        $response = $this->request($method, $path, $options);
+
+        $body = (string) $response->getBody();
+
+        try {
+            $data = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new \Wexample\PhpApi\Exceptions\ApiException(
+                'Invalid JSON response: ' . $e->getMessage(),
+                previous: $e
+            );
+        }
+
+        if (!is_array($data)) {
+            throw new \Wexample\PhpApi\Exceptions\ApiException('Unexpected JSON response shape (expected object/array).');
+        }
+
+        return $data;
     }
 
     /**
