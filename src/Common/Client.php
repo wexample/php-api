@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Wexample\PhpApi\Common;
 
-use Wexample\PhpApi\Const\HttpMethod;
 use function array_merge;
 
 use GuzzleHttp\Client as GuzzleClient;
@@ -17,6 +16,7 @@ use Psr\Http\Message\ResponseInterface;
 
 use function rtrim;
 
+use Wexample\PhpApi\Const\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiException;
 
 /**
@@ -39,7 +39,7 @@ class Client
      */
     public function __construct(
         string $baseUrl,
-        readonly ?string $apiKey = null,
+        public readonly ?string $apiKey = null,
         ?ClientInterface $httpClient = null,
         private array $defaultHeaders = [],
     ) {
@@ -105,7 +105,7 @@ class Client
             );
         }
 
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             throw new \Wexample\PhpApi\Exceptions\ApiException('Unexpected JSON response shape (expected object/array).');
         }
 
