@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wexample\PhpApi;
+namespace Wexample\PhpApi\Common;
 
 use function array_merge;
 
@@ -16,6 +16,7 @@ use Psr\Http\Message\ResponseInterface;
 
 use function rtrim;
 
+use Wexample\PhpApi\Const\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiException;
 
 /**
@@ -25,7 +26,7 @@ use Wexample\PhpApi\Exceptions\ApiException;
  * $client = new Client('https://api.wexample.com', 'api-key-here');
  * $response = $client->get('/v1/things', ['query' => ['page' => 1]]);
  */
-final class Client
+class Client
 {
     private ClientInterface $httpClient;
     private string $baseUrl;
@@ -38,7 +39,7 @@ final class Client
      */
     public function __construct(
         string $baseUrl,
-        private readonly ?string $apiKey = null,
+        public readonly ?string $apiKey = null,
         ?ClientInterface $httpClient = null,
         private array $defaultHeaders = [],
     ) {
@@ -48,9 +49,67 @@ final class Client
             'base_uri' => $this->baseUrl,
         ]);
 
-        if ($this->apiKey !== null && $this->apiKey !== '') {
-            $this->defaultHeaders['Authorization'] ??= 'Bearer ' . $this->apiKey;
+        $this->setApiKey($apiKey);
+    }
+
+    public function setApiKey(string $apiKey)
+    {
+        $this->setBearerToken($apiKey);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getDefaultHeaders(): array
+    {
+        return $this->defaultHeaders;
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    public function setDefaultHeaders(array $headers): void
+    {
+        foreach ($headers as $name => $value) {
+            $this->setDefaultHeader($name, $value);
         }
+    }
+
+    public function setDefaultHeader(string $name, string $value): void
+    {
+        $this->defaultHeaders[$name] = $value;
+    }
+
+    public function removeDefaultHeader(string $name): void
+    {
+        unset($this->defaultHeaders[$name]);
+    }
+
+    public function setBearerToken(string $token): void
+    {
+        $this->setDefaultHeader('Authorization', 'Bearer ' . $token);
+    }
+
+    protected function requestJson(string $method, string $path, array $options = []): array
+    {
+        $response = $this->request($method, $path, $options);
+
+        $body = (string) $response->getBody();
+
+        try {
+            $data = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new \Wexample\PhpApi\Exceptions\ApiException(
+                'Invalid JSON response: ' . $e->getMessage(),
+                previous: $e
+            );
+        }
+
+        if (! is_array($data)) {
+            throw new \Wexample\PhpApi\Exceptions\ApiException('Unexpected JSON response shape (expected object/array).');
+        }
+
+        return $data;
     }
 
     /**
@@ -60,7 +119,7 @@ final class Client
      */
     public function get(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('GET', $path, $options);
+        return $this->request(HttpMethod::GET, $path, $options);
     }
 
     /**
@@ -70,7 +129,7 @@ final class Client
      */
     public function post(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('POST', $path, $options);
+        return $this->request(HttpMethod::POST, $path, $options);
     }
 
     /**
@@ -80,7 +139,7 @@ final class Client
      */
     public function put(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('PUT', $path, $options);
+        return $this->request(HttpMethod::PUT, $path, $options);
     }
 
     /**
@@ -90,7 +149,7 @@ final class Client
      */
     public function patch(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('PATCH', $path, $options);
+        return $this->request(HttpMethod::PATCH, $path, $options);
     }
 
     /**
@@ -100,7 +159,7 @@ final class Client
      */
     public function delete(string $path, array $options = []): ResponseInterface
     {
-        return $this->request('DELETE', $path, $options);
+        return $this->request(HttpMethod::DELETE, $path, $options);
     }
 
     /**
