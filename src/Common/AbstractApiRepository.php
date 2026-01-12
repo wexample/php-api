@@ -63,22 +63,24 @@ abstract class AbstractApiRepository
      * @return AbstractApiEntity[]
      */
     public function fetchList(
-        int $page = 0,
+        array $query = [],
+        ?int $page = null,
         ?int $length = null,
-        array $queryParams = [],
-        string $pathPart = 'list',
+        string $endpoint = 'list',
     ): array {
-        $queryParams['page'] = $page;
+        if ($page !== null) {
+            $query['page'] = $page;
+        }
 
         if ($length !== null) {
-            $queryParams['length'] = $length;
+            $query['length'] = $length;
         }
 
         $data = $this->client->requestJson(
             HttpMethod::GET,
-            $this->buildPath($pathPart),
+            $this->buildPath($endpoint),
             [
-                'query' => $queryParams,
+                'query' => $query,
             ]
         );
 
