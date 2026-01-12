@@ -89,4 +89,16 @@ abstract class AbstractApiRepository
 
         return $this->createFromApiCollection($items);
     }
+
+    public function fetch(string $identifier, string $endpoint = 'show'): AbstractApiEntity
+    {
+        $data = $this->client->requestJson(
+            HttpMethod::GET,
+            $this->buildPath($endpoint . '/' . rawurlencode($identifier))
+        );
+
+        $payload = is_array($data['data'] ?? null) ? $data['data'] : $data;
+
+        return $this->createFromApiItem($payload);
+    }
 }
