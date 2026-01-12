@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Wexample\PhpApi\Common;
 
 use InvalidArgumentException;
+use Wexample\PhpApi\Const\HttpMethod;
 
 abstract class AbstractApiRepository
 {
@@ -56,5 +57,34 @@ abstract class AbstractApiRepository
     protected function buildPath(string $pathSuffix): string
     {
         return static::getEntityName() . '/' . ltrim($pathSuffix, '/');
+    }
+
+    /**
+     * @return AbstractApiEntity[]
+     */
+    public function fetchList(
+        int $page = 0,
+        ?int $length = null,
+        array $queryParams = [],
+        string $pathPart = 'list',
+    ): array {
+        $queryParams['page'] = $page;
+
+        if ($length !== null) {
+            $queryParams['length'] = $length;
+        }
+
+        $data = $this->client->requestJson(
+            HttpMethod::GET,
+            $this->buildPath($pathPart),
+            [
+                'query' => $queryParams,
+            ]
+        );
+
+        $payload = is_array($data['data'] ?? null) ? $data['data'] : $data;
+        $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+
+        return $this->createFromApiCollection($items);
     }
 }
