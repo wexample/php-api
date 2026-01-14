@@ -33,7 +33,11 @@ abstract class AbstractApiRepository
     /**
      * @return AbstractApiEntity
      */
-    protected function createFromApiItem(array $data): AbstractApiEntity
+    protected function createFromApiItem(
+        array $data,
+        array $metadata = [],
+        array $relationships = [],
+    ): AbstractApiEntity
     {
         $entityType = static::getEntityType();
 
@@ -47,8 +51,9 @@ abstract class AbstractApiRepository
     {
         $output = [];
 
-        foreach ($collection as $data) {
-            $output[] = $this->createFromApiItem($data);
+        foreach ($collection as $item) {
+            [$data, $metadata, $relationships] = $this->splitApiItem($item);
+            $output[] = $this->createFromApiItem($data, $metadata, $relationships);
         }
 
         return $output;
@@ -57,6 +62,18 @@ abstract class AbstractApiRepository
     protected function buildPath(string $pathSuffix): string
     {
         return static::getEntityName() . '/' . ltrim($pathSuffix, '/');
+    }
+
+    /**
+     * @return array{0: array, 1: array, 2: array}
+     */
+    protected function splitApiItem(array $item): array
+    {
+        $data = is_array($item['entity'] ?? null) ? $item['entity'] : $item;
+        $metadata = is_array($item['metadata'] ?? null) ? $item['metadata'] : [];
+        $relationships = is_array($item['relationships'] ?? null) ? $item['relationships'] : [];
+
+        return [$data, $metadata, $relationships];
     }
 
     /**
@@ -98,7 +115,8 @@ abstract class AbstractApiRepository
         );
 
         $payload = is_array($data['data'] ?? null) ? $data['data'] : $data;
+        [$item, $metadata, $relationships] = $this->splitApiItem($payload);
 
-        return $this->createFromApiItem($payload);
+        return $this->createFromApiItem($item, $metadata, $relationships);
     }
 }
