@@ -43,6 +43,7 @@ abstract class AbstractApiRepository
 
         $entity = $entityType::fromArray($data);
         $entity->setMetadata($metadata);
+        $entity->setRelationships($this->createRelationships($relationships));
 
         return $entity;
     }
@@ -65,6 +66,40 @@ abstract class AbstractApiRepository
     protected function buildPath(string $pathSuffix): string
     {
         return static::getEntityName() . '/' . ltrim($pathSuffix, '/');
+    }
+
+    /**
+     * @return AbstractApiEntity[]
+     */
+    protected function createRelationships(array $relationships): array
+    {
+        $output = [];
+
+        foreach ($relationships as $relationship) {
+            if (! is_array($relationship)) {
+                continue;
+            }
+
+            $type = $relationship['type'] ?? null;
+
+            if (! is_string($type) || $type === '') {
+                continue;
+            }
+
+            $data = $relationship['entity'] ?? $relationship['data'] ?? $relationship;
+
+            if (! is_array($data)) {
+                continue;
+            }
+
+            unset($data['type']);
+
+            $repository = $this->client->getRepository($type);
+            $entityType = $repository::getEntityType();
+            $output[] = $entityType::fromArray($data);
+        }
+
+        return $output;
     }
 
     /**
