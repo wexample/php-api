@@ -41,7 +41,10 @@ abstract class AbstractApiRepository
     {
         $entityType = static::getEntityType();
 
-        return $entityType::fromArray($data);
+        $entity = $entityType::fromArray($data);
+        $entity->setMetadata($metadata);
+
+        return $entity;
     }
 
     /**

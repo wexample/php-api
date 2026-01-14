@@ -8,6 +8,7 @@ abstract class AbstractApiEntity
 {
     public function __construct(
         protected ?string $secureId = null,
+        protected array $metadata = [],
     ) {
     }
 
@@ -35,5 +36,15 @@ abstract class AbstractApiEntity
     public function getSecureId(): ?string
     {
         return $this->secureId;
+    }
+
+    public function getMetadata(): array
+    {
+        return $this->metadata;
+    }
+
+    public function setMetadata(array $metadata): void
+    {
+        $this->metadata = $metadata;
     }
 }
