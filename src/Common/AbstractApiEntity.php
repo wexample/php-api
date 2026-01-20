@@ -6,14 +6,18 @@ namespace Wexample\PhpApi\Common;
 
 use BadMethodCallException;
 use ReflectionClass;
+use Wexample\Helpers\Class\Traits\HasSnakeShortClassNameClassTrait;
 
 abstract class AbstractApiEntity
 {
+    use HasSnakeShortClassNameClassTrait;
+
     public function __construct(
         protected ?string $secureId = null,
         protected array $metadata = [],
         protected array $relationships = [],
-    ) {
+    )
+    {
     }
 
     abstract public static function fromArray(array $data): static;
@@ -62,7 +66,10 @@ abstract class AbstractApiEntity
         $this->relationships = $relationships;
     }
 
-    public function __call(string $name, array $arguments): mixed
+    public function __call(
+        string $name,
+        array $arguments
+    ): mixed
     {
         if (preg_match('/^get(.+)SecureId$/', $name, $matches) === 1) {
             $property = lcfirst($matches[1]) . 'SecureId';
@@ -86,7 +93,7 @@ abstract class AbstractApiEntity
         $normalizedTarget = $this->normalizeRelationshipName($name);
 
         foreach ($this->relationships as $relationship) {
-            if (! $relationship instanceof AbstractApiEntity) {
+            if (!$relationship instanceof AbstractApiEntity) {
                 continue;
             }
 
