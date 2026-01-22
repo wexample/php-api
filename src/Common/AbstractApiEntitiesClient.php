@@ -15,8 +15,7 @@ abstract class AbstractApiEntitiesClient extends AbstractApiClient
         ?string $apiKey = null,
         ?ClientInterface $httpClient = null,
         array $defaultHeaders = [],
-    )
-    {
+    ) {
         parent::__construct($baseUrl, $apiKey, $httpClient, $defaultHeaders);
 
         $this->entityManager = new ApiEntityManager($this, $this->getRepositoryClasses());

@@ -37,8 +37,7 @@ abstract class AbstractApiRepository
         array $data,
         array $metadata = [],
         array $relationships = [],
-    ): AbstractApiEntity
-    {
+    ): AbstractApiEntity {
         $entityType = static::getEntityType();
 
         $entity = $entityType::fromArray($data);

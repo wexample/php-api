@@ -16,8 +16,7 @@ abstract class AbstractApiEntity
         protected ?string $secureId = null,
         protected array $metadata = [],
         protected array $relationships = [],
-    )
-    {
+    ) {
     }
 
     abstract public static function fromArray(array $data): static;
@@ -69,8 +68,7 @@ abstract class AbstractApiEntity
     public function __call(
         string $name,
         array $arguments
-    ): mixed
-    {
+    ): mixed {
         if (preg_match('/^get(.+)SecureId$/', $name, $matches) === 1) {
             $property = lcfirst($matches[1]) . 'SecureId';
 
@@ -93,7 +91,7 @@ abstract class AbstractApiEntity
         $normalizedTarget = $this->normalizeRelationshipName($name);
 
         foreach ($this->relationships as $relationship) {
-            if (!$relationship instanceof AbstractApiEntity) {
+            if (! $relationship instanceof AbstractApiEntity) {
                 continue;
             }
 
