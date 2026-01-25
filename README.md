@@ -1,6 +1,6 @@
 # wexample/php-api
 
-Version: 1.0.91
+Version: 1.0.92
 
 Various api
 
