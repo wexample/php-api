@@ -8,6 +8,8 @@ use Wexample\PhpApi\Exceptions\ApiException;
 
 abstract class AbstractApiClient extends Client
 {
+    protected bool $debugEnabled = false;
+
     public function requestJson(string $method, string $path, array $options = []): array
     {
         try {
@@ -21,12 +23,14 @@ abstract class AbstractApiClient extends Client
         }
     }
 
+    public function setDebugEnabled(bool $enabled): void
+    {
+        $this->debugEnabled = $enabled;
+    }
+
     protected function isDebugEnabled(): bool
     {
-        $env = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? null;
-        $debug = $_ENV['PHP_API_DEBUG'] ?? $_SERVER['PHP_API_DEBUG'] ?? '1';
-
-        return $env === 'dev' && $debug !== '0';
+        return $this->debugEnabled;
     }
 
     protected function dumpApiException(
