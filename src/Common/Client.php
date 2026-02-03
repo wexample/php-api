@@ -57,6 +57,11 @@ class Client
         $this->setBearerToken($apiKey);
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
+    }
+
     /**
      * @return array<string, string>
      */
