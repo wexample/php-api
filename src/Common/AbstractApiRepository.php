@@ -42,7 +42,8 @@ abstract class AbstractApiRepository
 
         $entity = $entityType::fromArray($data);
         $entity->setMetadata($metadata);
-        $entity->setRelationships($this->buildRelationshipsForEntity($entityType, $data, $relationships));
+        $this->getEntityRegistry()->registerEntity($entity);
+        $entity->setRelationships($this->buildRelationshipsForEntity($entity, $entityType, $data, $relationships));
 
         return $entity;
     }
@@ -105,6 +106,7 @@ abstract class AbstractApiRepository
      * @return AbstractApiEntity[]
      */
     protected function buildRelationshipsForEntity(
+        AbstractApiEntity $owner,
         string $entityType,
         array $data,
         array $relationships,
@@ -142,7 +144,7 @@ abstract class AbstractApiRepository
             $value = $data[$apiField] ?? null;
 
             if ($type === 'relation') {
-                $related = $this->resolveRelationshipEntity($target, $value, $relationships);
+                $related = $this->resolveRelationshipEntity($owner, $target, $value, $relationships);
                 if ($related !== null) {
                     $output[] = $related;
                 }
@@ -151,7 +153,7 @@ abstract class AbstractApiRepository
 
             $items = is_array($value) ? $value : ($value === null ? [] : [$value]);
             foreach ($items as $item) {
-                $related = $this->resolveRelationshipEntity($target, $item, $relationships);
+                $related = $this->resolveRelationshipEntity($owner, $target, $item, $relationships);
                 if ($related !== null) {
                     $output[] = $related;
                 }
@@ -162,6 +164,7 @@ abstract class AbstractApiRepository
     }
 
     protected function resolveRelationshipEntity(
+        AbstractApiEntity $owner,
         string $target,
         mixed $value,
         array $relationships,
@@ -195,7 +198,10 @@ abstract class AbstractApiRepository
             return null;
         }
 
-        return new ApiEntityStub($target, $id);
+        $stub = new ApiEntityStub($target, $id);
+        $this->getEntityRegistry()->registerStub($owner, $stub);
+
+        return $stub;
     }
 
     /**
@@ -211,6 +217,18 @@ abstract class AbstractApiRepository
         $schemas = $this->client->getEntitySchemas();
 
         return $schemas;
+    }
+
+    protected function getEntityRegistry(): ApiEntityRegistry
+    {
+        if (! method_exists($this->client, 'getEntityRegistry')) {
+            throw new \RuntimeException('Client must implement getEntityRegistry() to hydrate relationships.');
+        }
+
+        /** @var ApiEntityRegistry $registry */
+        $registry = $this->client->getEntityRegistry();
+
+        return $registry;
     }
 
     /**
