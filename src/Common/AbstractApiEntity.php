@@ -65,10 +65,51 @@ abstract class AbstractApiEntity
         $this->relationships = $relationships;
     }
 
+    public function isStub(): bool
+    {
+        return false;
+    }
+
+    public function replaceRelationship(ApiEntityStub $stub, AbstractApiEntity $entity): void
+    {
+        foreach ($this->relationships as $index => $relationship) {
+            if (! $relationship instanceof AbstractApiEntity) {
+                continue;
+            }
+
+            if ($relationship === $stub) {
+                $this->relationships[$index] = $entity;
+                continue;
+            }
+
+            if ($relationship instanceof ApiEntityStub) {
+                if (
+                    $relationship->getSecureId() === $stub->getSecureId()
+                    && $this->normalizeRelationshipName($relationship->getTargetName())
+                        === $this->normalizeRelationshipName($stub->getTargetName())
+                ) {
+                    $this->relationships[$index] = $entity;
+                }
+            }
+        }
+    }
+
     public function __call(
         string $name,
         array $arguments
     ): mixed {
+        if (preg_match('/^get(.+)$/', $name, $matches) === 1) {
+            $relationship = $this->findRelationshipByName($matches[1]);
+            if ($relationship !== null) {
+                return $relationship;
+            }
+
+            $relationships = $this->findRelationshipsByName($matches[1]);
+            if ($relationships !== []) {
+                return $relationships;
+            }
+        }
+
         if (preg_match('/^get(.+)SecureId$/', $name, $matches) === 1) {
             $property = lcfirst($matches[1]) . 'SecureId';
 
@@ -95,6 +136,13 @@ abstract class AbstractApiEntity
                 continue;
             }
 
+            if ($relationship instanceof ApiEntityStub) {
+                if ($this->normalizeRelationshipName($relationship->getTargetName()) === $normalizedTarget) {
+                    return $relationship;
+                }
+                continue;
+            }
+
             $shortName = (new ReflectionClass($relationship))->getShortName();
 
             if (strcasecmp($shortName, $name) === 0) {
@@ -109,6 +157,41 @@ abstract class AbstractApiEntity
         }
 
         return null;
+    }
+
+    /**
+     * @return AbstractApiEntity[]
+     */
+    protected function findRelationshipsByName(string $name): array
+    {
+        $normalizedTarget = $this->normalizeRelationshipName($name);
+        $matches = [];
+
+        foreach ($this->relationships as $relationship) {
+            if (! $relationship instanceof AbstractApiEntity) {
+                continue;
+            }
+
+            if ($relationship instanceof ApiEntityStub) {
+                if ($this->normalizeRelationshipName($relationship->getTargetName()) === $normalizedTarget) {
+                    $matches[] = $relationship;
+                }
+                continue;
+            }
+
+            $shortName = (new ReflectionClass($relationship))->getShortName();
+            if (strcasecmp($shortName, $name) === 0) {
+                $matches[] = $relationship;
+                continue;
+            }
+
+            $entityName = $relationship::getEntityName();
+            if ($this->normalizeRelationshipName($entityName) === $normalizedTarget) {
+                $matches[] = $relationship;
+            }
+        }
+
+        return $matches;
     }
 
     protected function normalizeRelationshipName(string $name): string
