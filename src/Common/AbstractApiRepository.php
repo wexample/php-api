@@ -136,9 +136,7 @@ abstract class AbstractApiRepository
                 throw new \RuntimeException('[php-api] schema property missing target.');
             }
 
-            $apiField = $property['apiField'] ?? $propertyName;
-
-            $value = $data[$apiField] ?? null;
+            $value = $data[$propertyName] ?? null;
 
             if ($type === 'relation') {
                 $related = $this->resolveRelationshipEntity($owner, $target, $value, $relationships);
@@ -249,13 +247,11 @@ abstract class AbstractApiRepository
                 continue;
             }
 
-            $apiField = $property['apiField'] ?? $propertyName;
-
-            if (! array_key_exists($apiField, $data)) {
+            if (! array_key_exists($propertyName, $data)) {
                 continue;
             }
 
-            $value = $data[$apiField];
+            $value = $data[$propertyName];
             $nullable = (bool) ($property['nullable'] ?? false);
 
             if ($value === null && ! $nullable) {
