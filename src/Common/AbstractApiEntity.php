@@ -6,6 +6,7 @@ namespace Wexample\PhpApi\Common;
 
 use BadMethodCallException;
 use ReflectionClass;
+use Wexample\Helpers\Helper\ClassHelper;
 use Wexample\Helpers\Class\Traits\HasSnakeShortClassNameClassTrait;
 
 abstract class AbstractApiEntity
@@ -152,7 +153,7 @@ abstract class AbstractApiEntity
             return $this->$name;
         }
 
-        $getter = 'get' . ucfirst($name);
+        $getter = ClassHelper::buildFieldGetterName($name);
         if (method_exists($this, $getter)) {
             return $this->$getter();
         }
