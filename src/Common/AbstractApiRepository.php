@@ -269,11 +269,7 @@ abstract class AbstractApiRepository
         AbstractApiEntity $entity,
         array $data
     ): void {
-        $secureId = $data['secureId'] ?? null;
-
-        if (is_string($secureId) && $secureId !== '') {
-            $this->assignPropertyValue($entity, 'secureId', $secureId);
-        }
+        $this->assignPropertyValue($entity, 'secureId', (string) $data['secureId']);
     }
 
     protected function validateExtraFields(
