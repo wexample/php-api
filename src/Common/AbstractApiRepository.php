@@ -269,7 +269,7 @@ abstract class AbstractApiRepository
         AbstractApiEntity $entity,
         array $data
     ): void {
-        $secureId = $data['secureId'] ?? $data['id'] ?? null;
+        $secureId = $data['secureId'] ?? null;
 
         if (is_string($secureId) && $secureId !== '') {
             $this->assignPropertyValue($entity, 'secureId', $secureId);
@@ -280,7 +280,7 @@ abstract class AbstractApiRepository
         array $data,
         array $schema
     ): void {
-        $allowed = ['secureId', 'id'];
+        $allowed = ['secureId'];
 
         foreach ($schema['properties'] as $property) {
             if (! is_array($property)) {
