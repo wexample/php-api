@@ -119,16 +119,6 @@ abstract class AbstractApiEntity
             }
         }
 
-        if (preg_match('/^get(.+)SecureId$/', $name, $matches) === 1) {
-            $property = lcfirst($matches[1]) . 'SecureId';
-
-            if (property_exists($this, $property)) {
-                return $this->$property;
-            }
-
-            return null;
-        }
-
         if (preg_match('/^get(.+)Relationship$/', $name, $matches) === 1) {
             return $this->findRelationshipByName($matches[1]);
         }
