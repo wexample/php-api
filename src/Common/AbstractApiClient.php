@@ -42,6 +42,14 @@ abstract class AbstractApiClient extends Client
         $payload = $options['json'] ?? null;
         $responseData = $exception->getResponseData();
         $responseBody = $exception->getResponseBody();
+        $decodedBody = null;
+
+        if ($responseData === null && is_string($responseBody) && $responseBody !== '') {
+            $decoded = json_decode($responseBody, true);
+            if (is_array($decoded)) {
+                $decodedBody = $decoded;
+            }
+        }
 
         $debugPayload = [
             'endpoint' => $this->buildFullUrl($path),
@@ -51,6 +59,9 @@ abstract class AbstractApiClient extends Client
                 'class' => $exception::class,
                 'message' => $exception->getMessage(),
                 'code' => $exception->getCode(),
+                'responseBody' => $responseBody,
+                'responseData' => $responseData,
+                'responseDecoded' => $decodedBody,
             ],
             'response' => [
                 'data' => $responseData,
@@ -59,18 +70,15 @@ abstract class AbstractApiClient extends Client
             'curl' => $this->buildCurlCommand($method, $path, $payload),
         ];
 
-        $logPath = sys_get_temp_dir() . '/php_api_debug_' . date('Ymd_His') . '.log';
-        file_put_contents(
-            $logPath,
-            json_encode($debugPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        );
-
-        $debugPayload['logFile'] = $logPath;
-
         if (class_exists(\Symfony\Component\VarDumper\VarDumper::class)) {
             \Symfony\Component\VarDumper\VarDumper::dump($debugPayload);
         } else {
-            var_dump($debugPayload);
+            if (! headers_sent()) {
+                header('Content-Type: text/plain; charset=utf-8');
+            }
+
+            $encoded = json_encode($debugPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            echo $encoded !== false ? $encoded : var_export($debugPayload, true);
         }
 
         exit(1);
