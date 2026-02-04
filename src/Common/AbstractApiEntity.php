@@ -16,6 +16,7 @@ abstract class AbstractApiEntity
         protected ?string $secureId = null,
         protected array $metadata = [],
         protected array $relationships = [],
+        protected array $values = [],
     ) {
     }
 
@@ -102,6 +103,11 @@ abstract class AbstractApiEntity
         array $arguments
     ): mixed {
         if (preg_match('/^get(.+)$/', $name, $matches) === 1) {
+            $property = lcfirst($matches[1]);
+            if (array_key_exists($property, $this->values)) {
+                return $this->values[$property];
+            }
+
             $relationship = $this->findRelationshipByName($matches[1]);
             if ($relationship !== null) {
                 return $relationship;
@@ -127,7 +133,53 @@ abstract class AbstractApiEntity
             return $this->findRelationshipByName($matches[1]);
         }
 
+        if (preg_match('/^set(.+)$/', $name, $matches) === 1) {
+            $property = lcfirst($matches[1]);
+            $this->values[$property] = $arguments[0] ?? null;
+            return $this;
+        }
+
         throw new BadMethodCallException(sprintf('Method %s::%s does not exist.', static::class, $name));
+    }
+
+    public function __get(string $name): mixed
+    {
+        if (array_key_exists($name, $this->values)) {
+            return $this->values[$name];
+        }
+
+        $relationship = $this->findRelationshipByName($name);
+        if ($relationship !== null) {
+            return $relationship;
+        }
+
+        $relationships = $this->findRelationshipsByName($name);
+        if ($relationships !== []) {
+            return $relationships;
+        }
+
+        if (property_exists($this, $name)) {
+            return $this->$name;
+        }
+
+        $getter = 'get' . ucfirst($name);
+        if (method_exists($this, $getter)) {
+            return $this->$getter();
+        }
+
+        return null;
+    }
+
+    public function getValue(string $name): mixed
+    {
+        return $this->values[$name] ?? null;
+    }
+
+    public function setValue(string $name, mixed $value): self
+    {
+        $this->values[$name] = $value;
+
+        return $this;
     }
 
     protected function findRelationshipByName(string $name): ?AbstractApiEntity

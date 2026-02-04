@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Wexample\PhpApi\Common;
 
 use InvalidArgumentException;
+use Wexample\Helpers\Helper\ClassHelper;
 use Wexample\PhpApi\Const\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiSchemaException;
 use Wexample\PhpApi\Helper\SchemaHelper;
@@ -290,17 +291,17 @@ abstract class AbstractApiRepository
         string $propertyName,
         mixed $value
     ): void {
-        $setter = 'set' . ucfirst($propertyName);
-        if (method_exists($entity, $setter)) {
-            $entity->{$setter}($value);
-            return;
-        }
-
         $reflection = new \ReflectionObject($entity);
         if ($reflection->hasProperty($propertyName)) {
             $property = $reflection->getProperty($propertyName);
             $property->setAccessible(true);
             $property->setValue($entity, $value);
+            return;
+        }
+
+        $setter = ClassHelper::buildFieldSetterName($propertyName);
+        if (method_exists($entity, $setter) || method_exists($entity, '__call')) {
+            $entity->{$setter}($value);
             return;
         }
 
