@@ -19,7 +19,10 @@ abstract class AbstractApiEntity
     ) {
     }
 
-    abstract public static function fromArray(array $data): static;
+    public static function fromArray(array $data): static
+    {
+        return new static();
+    }
 
     /**
      * @return static[]

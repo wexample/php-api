@@ -6,6 +6,7 @@ namespace Wexample\PhpApi\Common;
 
 use InvalidArgumentException;
 use Wexample\PhpApi\Const\HttpMethod;
+use Wexample\PhpApi\Exceptions\ApiSchemaException;
 
 abstract class AbstractApiRepository
 {
@@ -235,6 +236,8 @@ abstract class AbstractApiRepository
         array $data,
         array $schema,
     ): void {
+        $entityName = is_string($schema['name'] ?? null) ? $schema['name'] : 'unknown';
+
         foreach ($schema['properties'] as $property) {
             if (! is_array($property)) {
                 continue;
@@ -258,10 +261,57 @@ abstract class AbstractApiRepository
             $nullable = (bool) ($property['nullable'] ?? false);
 
             if ($value === null && ! $nullable) {
-                throw new \RuntimeException('[php-api] non-nullable property is null: ' . $propertyName);
+                throw ApiSchemaException::nonNullableNull($entityName, $propertyName);
             }
 
+            $value = $this->normalizePropertyValue($value, $type, $nullable, $entityName, $propertyName);
+
             $this->assignPropertyValue($entity, $propertyName, $value);
+        }
+    }
+
+    protected function normalizePropertyValue(
+        mixed $value,
+        string $type,
+        bool $nullable,
+        string $entityName,
+        string $propertyName
+    ): mixed {
+        if ($value === null) {
+            return null;
+        }
+
+        if ($value === '' && $nullable && $type !== 'string') {
+            return null;
+        }
+
+        return match ($type) {
+            'int', 'integer' => (int) $value,
+            'float' => (float) $value,
+            'bool', 'boolean' => (bool) $value,
+            'datetime' => $this->normalizeDateTimeValue($value, $entityName, $propertyName),
+            'string' => (string) $value,
+            default => $value,
+        };
+    }
+
+    protected function normalizeDateTimeValue(
+        mixed $value,
+        string $entityName,
+        string $propertyName
+    ): ?\DateTimeImmutable {
+        if ($value instanceof \DateTimeImmutable) {
+            return $value;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return new \DateTimeImmutable($value->format(\DateTimeInterface::ATOM));
+        }
+
+        try {
+            return new \DateTimeImmutable((string) $value);
+        } catch (\Throwable $exception) {
+            throw ApiSchemaException::invalidDateTime($entityName, $propertyName, $exception);
         }
     }
 
@@ -277,6 +327,7 @@ abstract class AbstractApiRepository
         array $schema
     ): void {
         $allowed = ['secureId'];
+        $entityName = is_string($schema['name'] ?? null) ? $schema['name'] : 'unknown';
 
         foreach ($schema['properties'] as $property) {
             if (! is_array($property)) {
@@ -291,7 +342,7 @@ abstract class AbstractApiRepository
 
         foreach (array_keys($data) as $field) {
             if (! in_array($field, $allowed, true)) {
-                throw new \RuntimeException('[php-api] field not allowed by schema: ' . $field);
+                throw ApiSchemaException::fieldNotAllowed($entityName, $field);
             }
         }
     }
@@ -315,7 +366,7 @@ abstract class AbstractApiRepository
             return;
         }
 
-        throw new \RuntimeException('[php-api] property not found on entity: ' . $propertyName);
+        throw ApiSchemaException::propertyNotFound($entity::class, $propertyName);
     }
 
     protected function getEntityRegistry(): ApiEntityRegistry
