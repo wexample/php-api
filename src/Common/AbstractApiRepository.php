@@ -121,6 +121,7 @@ abstract class AbstractApiRepository
         $schema = $this->getEntitySchema($entityType);
 
         $output = [];
+        $relationshipMap = [];
 
         foreach ($schema['properties'] ?? [] as $property) {
             if (! is_array($property)) {
@@ -148,17 +149,37 @@ abstract class AbstractApiRepository
                 $related = $this->resolveRelationshipEntity($owner, $target, $value, $relationships);
                 if ($related !== null) {
                     $output[] = $related;
+                    $relationshipMap[$propertyName] = [
+                        'type' => 'relation',
+                        'items' => [$related],
+                    ];
+                } else {
+                    $relationshipMap[$propertyName] = [
+                        'type' => 'relation',
+                        'items' => [],
+                    ];
                 }
                 continue;
             }
 
             $items = is_array($value) ? $value : ($value === null ? [] : [$value]);
+            $collectionItems = [];
             foreach ($items as $item) {
                 $related = $this->resolveRelationshipEntity($owner, $target, $item, $relationships);
                 if ($related !== null) {
                     $output[] = $related;
+                    $collectionItems[] = $related;
                 }
             }
+
+            $relationshipMap[$propertyName] = [
+                'type' => 'collection',
+                'items' => $collectionItems,
+            ];
+        }
+
+        if (method_exists($owner, 'setRelationshipMap')) {
+            $owner->setRelationshipMap($relationshipMap);
         }
 
         return $output;

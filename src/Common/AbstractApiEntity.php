@@ -18,6 +18,7 @@ abstract class AbstractApiEntity
         protected array $metadata = [],
         protected array $relationships = [],
         protected array $values = [],
+        protected array $relationshipMap = [],
     ) {
     }
 
@@ -70,6 +71,16 @@ abstract class AbstractApiEntity
         $this->relationships = $relationships;
     }
 
+    public function setRelationshipMap(array $relationshipMap): void
+    {
+        $this->relationshipMap = $relationshipMap;
+    }
+
+    public function getRelationshipMap(): array
+    {
+        return $this->relationshipMap;
+    }
+
     public function isStub(): bool
     {
         return false;
@@ -109,14 +120,18 @@ abstract class AbstractApiEntity
                 return $this->values[$property];
             }
 
-            $relationship = $this->findRelationshipByName($matches[1]);
-            if ($relationship !== null) {
-                return $relationship;
+            if (array_key_exists($property, $this->relationshipMap)) {
+                return $this->resolveRelationshipMapValue($this->relationshipMap[$property] ?? null);
             }
 
             $relationships = $this->findRelationshipsByName($matches[1]);
             if ($relationships !== []) {
-                return $relationships;
+                return count($relationships) === 1 ? $relationships[0] : $relationships;
+            }
+
+            $relationship = $this->findRelationshipByName($matches[1]);
+            if ($relationship !== null) {
+                return $relationship;
             }
         }
 
@@ -139,14 +154,18 @@ abstract class AbstractApiEntity
             return $this->values[$name];
         }
 
-        $relationship = $this->findRelationshipByName($name);
-        if ($relationship !== null) {
-            return $relationship;
+        if (array_key_exists($name, $this->relationshipMap)) {
+            return $this->resolveRelationshipMapValue($this->relationshipMap[$name] ?? null);
         }
 
         $relationships = $this->findRelationshipsByName($name);
         if ($relationships !== []) {
-            return $relationships;
+            return count($relationships) === 1 ? $relationships[0] : $relationships;
+        }
+
+        $relationship = $this->findRelationshipByName($name);
+        if ($relationship !== null) {
+            return $relationship;
         }
 
         if (property_exists($this, $name)) {
@@ -161,12 +180,12 @@ abstract class AbstractApiEntity
         return null;
     }
 
-    public function getValue(string $name): mixed
+    public function retrieveValue(string $name): mixed
     {
         return $this->values[$name] ?? null;
     }
 
-    public function setValue(string $name, mixed $value): self
+    public function assignValue(string $name, mixed $value): self
     {
         $this->values[$name] = $value;
 
@@ -245,5 +264,25 @@ abstract class AbstractApiEntity
         $snake = preg_replace('/(?<!^)[A-Z]/', '_$0', $name) ?? $name;
 
         return strtolower($snake);
+    }
+
+    protected function resolveRelationshipMapValue(mixed $entry): mixed
+    {
+        if (! is_array($entry)) {
+            return null;
+        }
+
+        $type = $entry['type'] ?? null;
+        $items = is_array($entry['items'] ?? null) ? $entry['items'] : [];
+
+        if ($type === 'relation') {
+            return $items[0] ?? null;
+        }
+
+        if ($type === 'collection') {
+            return $items;
+        }
+
+        return null;
     }
 }
