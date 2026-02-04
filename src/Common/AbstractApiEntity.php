@@ -119,10 +119,6 @@ abstract class AbstractApiEntity
             }
         }
 
-        if (preg_match('/^get(.+)Relationship$/', $name, $matches) === 1) {
-            return $this->findRelationshipByName($matches[1]);
-        }
-
         if (preg_match('/^set(.+)$/', $name, $matches) === 1) {
             $property = lcfirst($matches[1]);
             $this->values[$property] = $arguments[0] ?? null;
