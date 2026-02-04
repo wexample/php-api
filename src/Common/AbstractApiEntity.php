@@ -139,6 +139,10 @@ abstract class AbstractApiEntity
             return $this;
         }
 
+        if (array_key_exists($name, $this->values)) {
+            return $this->values[$name];
+        }
+
         throw new BadMethodCallException(sprintf('Method %s::%s does not exist.', static::class, $name));
     }
 
