@@ -41,6 +41,7 @@ abstract class AbstractApiRepository
         $entityType = static::getEntityType();
 
         $entity = $entityType::fromArray($data);
+        $this->hydrateEntityFields($entity, $data, $this->getEntitySchema($entityType));
         $entity->setMetadata($metadata);
         $this->getEntityRegistry()->registerEntity($entity);
         $entity->setRelationships($this->buildRelationshipsForEntity($entity, $entityType, $data, $relationships));
@@ -111,19 +112,18 @@ abstract class AbstractApiRepository
         array $data,
         array $relationships,
     ): array {
-        $schemas = $this->getEntitySchemas();
-        $entityName = $entityType::getEntityName();
-        $schema = $schemas[$entityName] ?? null;
-
-        if (! is_array($schema)) {
-            return [];
-        }
+        $schema = $this->getEntitySchema($entityType);
 
         $output = [];
 
         foreach ($schema['properties'] ?? [] as $property) {
             if (! is_array($property)) {
                 continue;
+            }
+
+            $propertyName = $property['name'] ?? null;
+            if (! is_string($propertyName) || $propertyName === '') {
+                throw new \RuntimeException('[php-api] schema property missing name.');
             }
 
             $type = strtolower((string) ($property['type'] ?? ''));
@@ -133,13 +133,10 @@ abstract class AbstractApiRepository
 
             $target = $property['target'] ?? null;
             if (! is_string($target) || $target === '') {
-                continue;
+                throw new \RuntimeException('[php-api] schema property missing target.');
             }
 
-            $apiField = $property['apiField'] ?? $property['name'] ?? null;
-            if (! is_string($apiField) || $apiField === '') {
-                continue;
-            }
+            $apiField = $property['apiField'] ?? $propertyName;
 
             $value = $data[$apiField] ?? null;
 
@@ -217,6 +214,78 @@ abstract class AbstractApiRepository
         $schemas = $this->client->getEntitySchemas();
 
         return $schemas;
+    }
+
+    protected function getEntitySchema(string $entityType): array
+    {
+        $schemas = $this->getEntitySchemas();
+        $entityName = $entityType::getEntityName();
+        $schema = $schemas[$entityName] ?? null;
+
+        if (! is_array($schema) || ! is_array($schema['properties'] ?? null)) {
+            throw new \RuntimeException('[php-api] schema missing or invalid for entity.');
+        }
+
+        return $schema;
+    }
+
+    protected function hydrateEntityFields(
+        AbstractApiEntity $entity,
+        array $data,
+        array $schema,
+    ): void {
+        foreach ($schema['properties'] as $property) {
+            if (! is_array($property)) {
+                continue;
+            }
+
+            $propertyName = $property['name'] ?? null;
+            if (! is_string($propertyName) || $propertyName === '') {
+                throw new \RuntimeException('[php-api] schema property missing name.');
+            }
+
+            $type = strtolower((string) ($property['type'] ?? ''));
+            if (in_array($type, ['relation', 'collection'], true)) {
+                continue;
+            }
+
+            $apiField = $property['apiField'] ?? $propertyName;
+
+            if (! array_key_exists($apiField, $data)) {
+                continue;
+            }
+
+            $value = $data[$apiField];
+            $nullable = (bool) ($property['nullable'] ?? false);
+
+            if ($value === null && ! $nullable) {
+                throw new \RuntimeException('[php-api] non-nullable property is null: ' . $propertyName);
+            }
+
+            $this->assignPropertyValue($entity, $propertyName, $value);
+        }
+    }
+
+    protected function assignPropertyValue(
+        AbstractApiEntity $entity,
+        string $propertyName,
+        mixed $value
+    ): void {
+        $setter = 'set' . ucfirst($propertyName);
+        if (method_exists($entity, $setter)) {
+            $entity->{$setter}($value);
+            return;
+        }
+
+        $reflection = new \ReflectionObject($entity);
+        if ($reflection->hasProperty($propertyName)) {
+            $property = $reflection->getProperty($propertyName);
+            $property->setAccessible(true);
+            $property->setValue($entity, $value);
+            return;
+        }
+
+        throw new \RuntimeException('[php-api] property not found on entity: ' . $propertyName);
     }
 
     protected function getEntityRegistry(): ApiEntityRegistry
