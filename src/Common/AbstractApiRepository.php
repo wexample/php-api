@@ -41,7 +41,10 @@ abstract class AbstractApiRepository
         $entityType = static::getEntityType();
 
         $entity = $entityType::fromArray($data);
-        $this->hydrateEntityFields($entity, $data, $this->getEntitySchema($entityType));
+        $schema = $this->getEntitySchema($entityType);
+        $this->validateExtraFields($data, $schema);
+        $this->hydrateEntityFields($entity, $data, $schema);
+        $this->hydrateEntityIdentifier($entity, $data);
         $entity->setMetadata($metadata);
         $this->getEntityRegistry()->registerEntity($entity);
         $entity->setRelationships($this->buildRelationshipsForEntity($entity, $entityType, $data, $relationships));
@@ -259,6 +262,41 @@ abstract class AbstractApiRepository
             }
 
             $this->assignPropertyValue($entity, $propertyName, $value);
+        }
+    }
+
+    protected function hydrateEntityIdentifier(
+        AbstractApiEntity $entity,
+        array $data
+    ): void {
+        $secureId = $data['secureId'] ?? $data['id'] ?? null;
+
+        if (is_string($secureId) && $secureId !== '') {
+            $this->assignPropertyValue($entity, 'secureId', $secureId);
+        }
+    }
+
+    protected function validateExtraFields(
+        array $data,
+        array $schema
+    ): void {
+        $allowed = ['secureId', 'id'];
+
+        foreach ($schema['properties'] as $property) {
+            if (! is_array($property)) {
+                continue;
+            }
+
+            $propertyName = $property['name'] ?? null;
+            if (is_string($propertyName) && $propertyName !== '') {
+                $allowed[] = $propertyName;
+            }
+        }
+
+        foreach (array_keys($data) as $field) {
+            if (! in_array($field, $allowed, true)) {
+                throw new \RuntimeException('[php-api] field not allowed by schema: ' . $field);
+            }
         }
     }
 
