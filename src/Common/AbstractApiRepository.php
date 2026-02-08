@@ -70,6 +70,13 @@ abstract class AbstractApiRepository
         return $output;
     }
 
+    public function hydrateFromApiItem(array $item): AbstractApiEntity
+    {
+        [$data, $metadata, $relationships] = $this->splitApiItem($item);
+
+        return $this->createFromApiItem($data, $metadata, $relationships);
+    }
+
     protected function buildPath(string $pathSuffix): string
     {
         return static::getEntityName() . '/' . ltrim($pathSuffix, '/');

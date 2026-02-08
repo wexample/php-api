@@ -185,11 +185,21 @@ abstract class AbstractApiEntity
         return $this->values[$name] ?? null;
     }
 
+    public function retrieveMetadata(string $name): mixed
+    {
+        return $this->metadata[$name] ?? null;
+    }
+
     public function assignValue(string $name, mixed $value): self
     {
         $this->values[$name] = $value;
 
         return $this;
+    }
+
+    public function getValues(): array
+    {
+        return $this->values;
     }
 
     protected function findRelationshipByName(string $name): ?AbstractApiEntity
