@@ -79,7 +79,19 @@ abstract class AbstractApiRepository
 
     protected function buildPath(string $pathSuffix): string
     {
-        return static::getEntityName() . '/' . ltrim($pathSuffix, '/');
+        $entityName = static::getEntityName();
+        $entityName = str_replace('_', '-', $entityName);
+
+        return $entityName . '/' . ltrim($pathSuffix, '/');
+    }
+
+    public function post(string $endpoint, array $payload = []): array
+    {
+        return $this->client->requestJson(
+            HttpMethod::POST,
+            $this->buildPath($endpoint),
+            ['json' => $payload]
+        );
     }
 
     /**
