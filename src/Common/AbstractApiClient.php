@@ -15,7 +15,7 @@ abstract class AbstractApiClient extends Client
         try {
             return parent::requestJson($method, $path, $options);
         } catch (ApiException $exception) {
-            if ($this->isDebugEnabled()) {
+            if ($this->isDebugEnabled() && $this->shouldDumpApiException($exception)) {
                 $this->dumpApiException($method, $path, $options, $exception);
             }
 
@@ -31,6 +31,14 @@ abstract class AbstractApiClient extends Client
     protected function isDebugEnabled(): bool
     {
         return $this->debugEnabled;
+    }
+
+    protected function shouldDumpApiException(ApiException $exception): bool
+    {
+        $code = $exception->getCode();
+
+        // Keep normal application flow for expected client-side API responses.
+        return $code < 400 || $code >= 500;
     }
 
     protected function dumpApiException(
