@@ -152,14 +152,15 @@ abstract class AbstractApiRepository
                 throw new \RuntimeException('[php-api] schema property missing name.');
             }
 
-            $type = strtolower((string) ($property['type'] ?? ''));
-            if (! in_array($type, ['relation', 'collection'], true)) {
+            // `relation` = single linked entity, `collection` = list of linked entities.
+            $type = $property['type'] ?? null;
+            if ($type !== 'relation' && $type !== 'collection') {
                 continue;
             }
 
             $target = $property['target'] ?? null;
             if (! is_string($target) || $target === '') {
-                throw new \RuntimeException('[php-api] schema property missing target.');
+                continue;
             }
 
             $value = $data[$propertyName] ?? null;
