@@ -6,8 +6,8 @@ namespace Wexample\PhpApi\Common;
 
 use BadMethodCallException;
 use ReflectionClass;
-use Wexample\Helpers\Helper\ClassHelper;
 use Wexample\Helpers\Class\Traits\HasSnakeShortClassNameClassTrait;
+use Wexample\Helpers\Helper\ClassHelper;
 
 abstract class AbstractApiEntity
 {
@@ -95,6 +95,7 @@ abstract class AbstractApiEntity
 
             if ($relationship === $stub) {
                 $this->relationships[$index] = $entity;
+
                 continue;
             }
 
@@ -138,6 +139,7 @@ abstract class AbstractApiEntity
         if (preg_match('/^set(.+)$/', $name, $matches) === 1) {
             $property = lcfirst($matches[1]);
             $this->values[$property] = $arguments[0] ?? null;
+
             return $this;
         }
 
@@ -215,6 +217,7 @@ abstract class AbstractApiEntity
                 if ($this->normalizeRelationshipName($relationship->getTargetName()) === $normalizedTarget) {
                     return $relationship;
                 }
+
                 continue;
             }
 
@@ -251,12 +254,14 @@ abstract class AbstractApiEntity
                 if ($this->normalizeRelationshipName($relationship->getTargetName()) === $normalizedTarget) {
                     $matches[] = $relationship;
                 }
+
                 continue;
             }
 
             $shortName = (new ReflectionClass($relationship))->getShortName();
             if (strcasecmp($shortName, $name) === 0) {
                 $matches[] = $relationship;
+
                 continue;
             }
 

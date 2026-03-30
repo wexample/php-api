@@ -179,6 +179,7 @@ abstract class AbstractApiRepository
                         'items' => [],
                     ];
                 }
+
                 continue;
             }
 
@@ -220,6 +221,7 @@ abstract class AbstractApiRepository
             }
 
             $entityType = $targetRepository::getEntityType();
+
             return $entityType::fromArray($item);
         }
 
@@ -232,6 +234,7 @@ abstract class AbstractApiRepository
             }
 
             $entityType = $targetRepository::getEntityType();
+
             return $entityType::fromArray($item);
         }
 
@@ -337,12 +340,14 @@ abstract class AbstractApiRepository
             $property = $reflection->getProperty($propertyName);
             $property->setAccessible(true);
             $property->setValue($entity, $value);
+
             return;
         }
 
         $setter = ClassHelper::buildFieldSetterName($propertyName);
         if (method_exists($entity, $setter) || method_exists($entity, '__call')) {
             $entity->{$setter}($value);
+
             return;
         }
 

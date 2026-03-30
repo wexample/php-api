@@ -57,6 +57,7 @@ class ApiEntityRegistry
         $existing = $this->entities[$entityName][$secureId] ?? null;
         if ($existing instanceof AbstractApiEntity) {
             $owner->replaceRelationship($stub, $existing);
+
             return;
         }
 
