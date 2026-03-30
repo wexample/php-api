@@ -9,6 +9,7 @@ use GuzzleHttp\ClientInterface;
 abstract class AbstractApiEntitiesClient extends AbstractApiClient
 {
     private ApiEntityManager $entityManager;
+    private ApiEntityRegistry $entityRegistry;
 
     public function __construct(
         string $baseUrl,
@@ -19,6 +20,7 @@ abstract class AbstractApiEntitiesClient extends AbstractApiClient
         parent::__construct($baseUrl, $apiKey, $httpClient, $defaultHeaders);
 
         $this->entityManager = new ApiEntityManager($this, $this->getRepositoryClasses());
+        $this->entityRegistry = new ApiEntityRegistry();
     }
 
     /**
@@ -29,6 +31,11 @@ abstract class AbstractApiEntitiesClient extends AbstractApiClient
     public function getEntityManager(): ApiEntityManager
     {
         return $this->entityManager;
+    }
+
+    public function getEntityRegistry(): ApiEntityRegistry
+    {
+        return $this->entityRegistry;
     }
 
     /**

@@ -57,6 +57,11 @@ class Client
         $this->setBearerToken($apiKey);
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -178,6 +183,13 @@ class Client
         try {
             $response = $this->httpClient->request($method, $uri, $options);
         } catch (GuzzleException $exception) {
+            if (
+                $exception instanceof \GuzzleHttp\Exception\RequestException
+                && $exception->getResponse() instanceof ResponseInterface
+            ) {
+                throw ApiException::fromResponse($exception->getResponse(), $exception);
+            }
+
             throw new ApiException('HTTP request failed: ' . $exception->getMessage(), previous: $exception);
         }
 
