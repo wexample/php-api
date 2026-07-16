@@ -7,7 +7,9 @@ namespace Wexample\PhpApi\Common;
 use InvalidArgumentException;
 use Wexample\Helpers\Helper\ClassHelper;
 use Wexample\PhpApi\Const\HttpMethod;
+use Wexample\PhpApi\Exceptions\ApiEnvelopeException;
 use Wexample\PhpApi\Exceptions\ApiSchemaException;
+use Wexample\PhpApi\Helper\ApiEnvelopeHelper;
 use Wexample\PhpApi\Helper\SchemaHelper;
 
 abstract class AbstractApiRepository
@@ -316,18 +318,18 @@ abstract class AbstractApiRepository
         }
     }
 
-    protected function hydrateEntityIdentifier(
-        AbstractApiEntity $entity,
-        array $data
-    ): void {
-        $this->assignPropertyValue($entity, 'secureId', (string) $data['secureId']);
-    }
-
     protected function validateExtraFields(
         array $data,
         array $schema
     ): void {
         SchemaHelper::assertAllowedFields($data, $schema, ['secureId']);
+    }
+
+    protected function hydrateEntityIdentifier(
+        AbstractApiEntity $entity,
+        array $data
+    ): void {
+        $this->assignPropertyValue($entity, 'secureId', (string) $data['secureId']);
     }
 
     protected function assignPropertyValue(
@@ -403,10 +405,35 @@ abstract class AbstractApiRepository
             ]
         );
 
-        $payload = is_array($data['data'] ?? null) ? $data['data'] : $data;
-        $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+        return $this->createFromApiCollection(
+            $this->extractItems($this->extractPayload($data))
+        );
+    }
 
-        return $this->createFromApiCollection($items);
+    protected function extractPayload(array $response): array
+    {
+        $payload = ApiEnvelopeHelper::unwrap($response);
+
+        if (! is_array($payload)) {
+            throw new ApiEnvelopeException(
+                message: 'Invalid API response: missing or invalid "data" object.',
+                envelope: $response,
+            );
+        }
+
+        return $payload;
+    }
+
+    protected function extractItems(array $payload): array
+    {
+        if (! is_array($payload['items'] ?? null)) {
+            throw new ApiEnvelopeException(
+                message: 'Invalid API payload: missing "items" array.',
+                envelope: $payload,
+            );
+        }
+
+        return $payload['items'];
     }
 
     public function fetch(string $identifier, string $endpoint = 'show'): AbstractApiEntity
@@ -416,8 +443,7 @@ abstract class AbstractApiRepository
             $this->buildPath($endpoint . '/' . rawurlencode($identifier))
         );
 
-        $payload = is_array($data['data'] ?? null) ? $data['data'] : $data;
-        [$item, $metadata, $relationships] = $this->splitApiItem($payload);
+        [$item, $metadata, $relationships] = $this->splitApiItem($this->extractPayload($data));
 
         return $this->createFromApiItem($item, $metadata, $relationships);
     }

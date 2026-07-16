@@ -178,6 +178,17 @@ class Client
     {
         $options['headers'] = $this->buildHeaders($options['headers'] ?? []);
 
+        if (isset($options['multipart'])) {
+            // Let Guzzle generate the multipart boundary: a forced
+            // Content-Type (e.g. a default application/json header) would
+            // corrupt the request body declaration.
+            foreach (array_keys($options['headers']) as $name) {
+                if (strtolower($name) === 'content-type') {
+                    unset($options['headers'][$name]);
+                }
+            }
+        }
+
         $uri = ltrim($path, '/');
 
         try {

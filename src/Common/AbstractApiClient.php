@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Wexample\PhpApi\Common;
 
+use Wexample\PhpApi\Const\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiException;
 
 abstract class AbstractApiClient extends Client
@@ -21,6 +22,70 @@ abstract class AbstractApiClient extends Client
 
             throw $exception;
         }
+    }
+
+    /**
+     * Posts a multipart request holding a "data" JSON field plus files as
+     * upload_0, upload_1, ... — same convention as js-api's
+     * requestFormDataFromJson.
+     *
+     * @param array<int, \SplFileInfo|resource|string|array{contents: mixed, filename?: string}> $files
+     *        Each file may be a path, an SplFileInfo, an open resource, or a
+     *        Guzzle multipart part (without "name").
+     */
+    public function requestFormDataFromJson(
+        string $path,
+        array $data,
+        array $files = [],
+        string $fileKeyPrefix = 'upload_',
+    ): array {
+        $multipart = [
+            [
+                'name' => 'data',
+                'contents' => json_encode($data, JSON_THROW_ON_ERROR),
+            ],
+        ];
+
+        foreach (array_values($files) as $index => $file) {
+            $multipart[] = $this->buildMultipartFilePart($fileKeyPrefix . $index, $file);
+        }
+
+        return $this->requestJson(
+            HttpMethod::POST,
+            $path,
+            ['multipart' => $multipart]
+        );
+    }
+
+    /**
+     * @param \SplFileInfo|resource|string|array{contents: mixed, filename?: string} $file
+     */
+    protected function buildMultipartFilePart(string $name, mixed $file): array
+    {
+        if ($file instanceof \SplFileInfo) {
+            return [
+                'name' => $name,
+                'contents' => fopen($file->getPathname(), 'rb'),
+                'filename' => $file->getFilename(),
+            ];
+        }
+
+        if (is_array($file)) {
+            return ['name' => $name] + $file;
+        }
+
+        if (is_resource($file)) {
+            return [
+                'name' => $name,
+                'contents' => $file,
+            ];
+        }
+
+        return [
+            'name' => $name,
+            'contents' => fopen((string) $file, 'rb'),
+            'filename' => basename((string) $file),
+        ];
     }
 
     public function setDebugEnabled(bool $enabled): void
