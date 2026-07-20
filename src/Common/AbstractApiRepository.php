@@ -6,6 +6,7 @@ namespace Wexample\PhpApi\Common;
 
 use InvalidArgumentException;
 use Wexample\Helpers\Helper\ClassHelper;
+use Wexample\Helpers\Helper\TextHelper;
 use Wexample\PhpApi\Const\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiEnvelopeException;
 use Wexample\PhpApi\Exceptions\ApiSchemaException;
@@ -65,26 +66,30 @@ abstract class AbstractApiRepository
         $output = [];
 
         foreach ($collection as $item) {
-            [$data, $metadata, $relationships] = $this->splitApiItem($item);
-            $output[] = $this->createFromApiItem($data, $metadata, $relationships);
+            $output[] = $this->hydrateFromApiItem($item);
         }
 
         return $output;
     }
 
+    /**
+     * Public hydration gate for a single raw API item (REST payload, live
+     * update): validates the {type, entity} shape then hydrates strictly.
+     */
     public function hydrateFromApiItem(array $item): AbstractApiEntity
     {
         [$data, $metadata, $relationships] = $this->splitApiItem($item);
+        $this->assertApiItemType($item);
 
         return $this->createFromApiItem($data, $metadata, $relationships);
     }
 
     protected function buildPath(string $pathSuffix): string
     {
-        $entityName = static::getEntityName();
-        $entityName = str_replace('_', '-', $entityName);
+        // Routes are kebab-case, whatever casing the entity name uses.
+        $base = TextHelper::toKebab(static::getEntityName());
 
-        return $entityName . '/' . ltrim($pathSuffix, '/');
+        return $base . '/' . ltrim($pathSuffix, '/');
     }
 
     public function post(string $endpoint, array $payload = []): array
@@ -94,40 +99,6 @@ abstract class AbstractApiRepository
             $this->buildPath($endpoint),
             ['json' => $payload]
         );
-    }
-
-    /**
-     * @return AbstractApiEntity[]
-     */
-    protected function createRelationships(array $relationships): array
-    {
-        $output = [];
-
-        foreach ($relationships as $relationship) {
-            if (! is_array($relationship)) {
-                continue;
-            }
-
-            $type = $relationship['type'] ?? null;
-
-            if (! is_string($type) || $type === '') {
-                continue;
-            }
-
-            $data = $relationship['entity'] ?? $relationship['data'] ?? $relationship;
-
-            if (! is_array($data)) {
-                continue;
-            }
-
-            unset($data['type']);
-
-            $repository = $this->client->getRepository($type);
-            $entityType = $repository::getEntityType();
-            $output[] = $entityType::fromArray($data);
-        }
-
-        return $output;
     }
 
     /**
@@ -168,7 +139,7 @@ abstract class AbstractApiRepository
             $value = $data[$propertyName] ?? null;
 
             if ($type === 'relation') {
-                $related = $this->resolveRelationshipEntity($owner, $target, $value, $relationships);
+                $related = $this->resolveRelationshipEntity($owner, $propertyName, $target, $value, $relationships);
                 if ($related !== null) {
                     $output[] = $related;
                     $relationshipMap[$propertyName] = [
@@ -188,7 +159,7 @@ abstract class AbstractApiRepository
             $items = is_array($value) ? $value : ($value === null ? [] : [$value]);
             $collectionItems = [];
             foreach ($items as $item) {
-                $related = $this->resolveRelationshipEntity($owner, $target, $item, $relationships);
+                $related = $this->resolveRelationshipEntity($owner, $propertyName, $target, $item, $relationships);
                 if ($related !== null) {
                     $output[] = $related;
                     $collectionItems[] = $related;
@@ -210,34 +181,19 @@ abstract class AbstractApiRepository
 
     protected function resolveRelationshipEntity(
         AbstractApiEntity $owner,
+        string $relationName,
         string $target,
         mixed $value,
         array $relationships,
     ): ?AbstractApiEntity {
         if (is_array($value)) {
-            [$item, $metadata, $itemRelationships] = $this->splitApiItem($value);
-
-            $targetRepository = $this->client->getRepository($target);
-            if ($targetRepository instanceof self) {
-                return $targetRepository->createFromApiItem($item, $metadata, $itemRelationships);
-            }
-
-            $entityType = $targetRepository::getEntityType();
-
-            return $entityType::fromArray($item);
+            return $this->getRelationshipRepository($owner, $relationName, $target)
+                ->hydrateFromApiItem($value);
         }
 
         if (is_string($value) && $value !== '' && isset($relationships[$value]) && is_array($relationships[$value])) {
-            [$item, $metadata, $itemRelationships] = $this->splitApiItem($relationships[$value]);
-
-            $targetRepository = $this->client->getRepository($target);
-            if ($targetRepository instanceof self) {
-                return $targetRepository->createFromApiItem($item, $metadata, $itemRelationships);
-            }
-
-            $entityType = $targetRepository::getEntityType();
-
-            return $entityType::fromArray($item);
+            return $this->getRelationshipRepository($owner, $relationName, $target)
+                ->hydrateFromApiItem($relationships[$value]);
         }
 
         $id = is_string($value) ? $value : null;
@@ -249,6 +205,28 @@ abstract class AbstractApiRepository
         $this->getEntityRegistry()->registerStub($owner, $stub);
 
         return $stub;
+    }
+
+    /**
+     * Resolves the repository hydrating a relationship, naming the owning
+     * entity and relation on failure: a bare "entity X is not registered"
+     * is undebuggable from a response.
+     */
+    protected function getRelationshipRepository(
+        AbstractApiEntity $owner,
+        string $relationName,
+        string $type,
+    ): AbstractApiRepository {
+        try {
+            return $this->client->getRepository($type);
+        } catch (\Throwable $exception) {
+            throw ApiSchemaException::unknownRelationship(
+                $owner::getEntityName(),
+                $relationName,
+                $type,
+                $exception
+            );
+        }
     }
 
     /**
@@ -369,15 +347,46 @@ abstract class AbstractApiRepository
     }
 
     /**
+     * Validates the {type, entity, metadata, relationships} shape instead of
+     * trusting the response blindly; metadata/relationships may be absent
+     * (decorations), type and entity may not.
+     *
      * @return array{0: array, 1: array, 2: array}
      */
     protected function splitApiItem(array $item): array
     {
-        $data = is_array($item['entity'] ?? null) ? $item['entity'] : $item;
+        $entityName = static::getEntityName();
+
+        $type = $item['type'] ?? null;
+        if (! is_string($type) || $type === '') {
+            throw ApiSchemaException::invalidItem($entityName, 'missing "type"');
+        }
+
+        if (! is_array($item['entity'] ?? null)) {
+            throw ApiSchemaException::invalidItem($entityName, 'missing "entity" object');
+        }
+
         $metadata = is_array($item['metadata'] ?? null) ? $item['metadata'] : [];
         $relationships = is_array($item['relationships'] ?? null) ? $item['relationships'] : [];
 
-        return [$data, $metadata, $relationships];
+        return [$item['entity'], $metadata, $relationships];
+    }
+
+    /**
+     * Asserts an API item carries this repository's entity type — called
+     * wherever the expected type is known before hydration.
+     */
+    protected function assertApiItemType(array $item): void
+    {
+        $entityName = static::getEntityName();
+        $type = $item['type'] ?? null;
+
+        if ($type !== $entityName) {
+            throw ApiSchemaException::itemTypeMismatch(
+                $entityName,
+                is_string($type) ? $type : get_debug_type($type)
+            );
+        }
     }
 
     /**
@@ -443,8 +452,6 @@ abstract class AbstractApiRepository
             $this->buildPath($endpoint . '/' . rawurlencode($identifier))
         );
 
-        [$item, $metadata, $relationships] = $this->splitApiItem($this->extractPayload($data));
-
-        return $this->createFromApiItem($item, $metadata, $relationships);
+        return $this->hydrateFromApiItem($this->extractPayload($data));
     }
 }
