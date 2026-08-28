@@ -1,21 +1,3 @@
-# php_api
-
-Version: 3.0.1
-
-`wexample/php-api` is a PHP client library for talking to JSON APIs: a Guzzle-backed `Client` that prefixes a base URL, sends a `Authorization: Bearer` header on every call, and turns any response with a status of 400 or more into an `ApiException` carrying the decoded body. On top of it, src/Common/AbstractApiEntitiesClient.php adds an entity layer — repositories that unwrap the `{type, code, message?, data}` envelope produced by `wexample/symfony-api` controllers, check each item against the entity schema the client exposes, and return hydrated `AbstractApiEntity` objects with their relationships resolved instead of nested arrays.
-
-It is for PHP applications consuming a Wexample-style API, whether they only need the plain HTTP verbs and multipart uploads of src/Common/AbstractApiClient.php or the full schema-driven entity mapping.
-
-## Table of Contents
-
-- [Architecture](#architecture)
-- [Integration in the Suite](#integration-in-the-suite)
-- [Dependencies](#dependencies)
-- [Versioning & Compatibility Policy](#versioning--compatibility-policy)
-- [License](#license)
-- [About us](#about-us)
-- [Migration Notes](#migration-notes)
-
 ## Architecture
 
 The package is one inheritance chain of three client classes plus an entity layer hanging off the last of them. Everything lives under `Wexample\PhpApi\` (PSR-4 on `src/`, declared in composer.json), split into `Common/` (the classes an application extends), `Helper/` (stateless parsing), `Exceptions/` and `Const/`.
@@ -74,48 +56,3 @@ One rough edge to know before editing `Client::requestJson()`: its `catch (JsonE
 ### Dependencies
 
 composer.json requires only `php: >=7.4` and `guzzlehttp/guzzle: ^7.8` (PSR-7 interfaces arrive with it), yet the entity layer imports `Wexample\Helpers\Helper\ClassHelper`, `Wexample\Helpers\Helper\TextHelper` and `Wexample\Helpers\Class\Traits\HasSnakeShortClassNameClassTrait` — `wexample/helpers` must be on the autoloader for anything beyond the bare `Client`. Symfony's `VarDumper` is probed at runtime with `class_exists()` and is genuinely optional. The declared floor of PHP 7.4 is also below what the code uses: constructor property promotion, `match`, named arguments and typed class constants (`public const string CODE_UNKNOWN_FIELD`) put the real floor at PHP 8.3.
-
-## Integration in the Suite
-
-This package is part of the Wexample Suite — a collection of high-quality, modular tools designed to work seamlessly together across multiple languages and environments.
-
-### Related Packages
-
-The suite includes packages for configuration management, file handling, prompts, and more. Each package can be used independently or as part of the integrated suite.
-
-Visit the [Wexample Suite documentation](https://docs.wexample.com) for the complete package ecosystem.
-
-## Dependencies
-
-- php: >=7.4
-- guzzlehttp/guzzle: ^7.8
-
-## Versioning & Compatibility Policy
-
-Wexample packages follow **Semantic Versioning** (SemVer):
-
-- **MAJOR**: Breaking changes
-- **MINOR**: New features, backward compatible
-- **PATCH**: Bug fixes, backward compatible
-
-We maintain backward compatibility within major versions and provide clear migration guides for breaking changes.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-Free to use in both personal and commercial projects.
-
-## About us
-
-[Wexample](https://wexample.com) stands as a cornerstone of the digital ecosystem — a collective of seasoned engineers, researchers, and creators driven by a relentless pursuit of technological excellence. More than a media platform, it has grown into a vibrant community where innovation meets craftsmanship, and where every line of code reflects a commitment to clarity, durability, and shared intelligence.
-
-This packages suite embodies this spirit. Trusted by professionals and enthusiasts alike, it delivers a consistent, high-quality foundation for modern development — open, elegant, and battle-tested. Its reputation is built on years of collaboration, refinement, and rigorous attention to detail, making it a natural choice for those who demand both robustness and beauty in their tools.
-
-Wexample cultivates a culture of mastery. Each package, each contribution carries the mark of a community that values precision, ethics, and innovation — a community proud to shape the future of digital craftsmanship.
-
-## Migration Notes
-
-When upgrading between major versions, refer to the migration guides in the documentation.
-
-Breaking changes are clearly documented with upgrade paths and examples.
