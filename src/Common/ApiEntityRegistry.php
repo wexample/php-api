@@ -20,15 +20,15 @@ class ApiEntityRegistry
 
     public function registerEntity(AbstractApiEntity $entity): void
     {
-        $secureId = $entity->getSecureId();
-        if (! is_string($secureId) || $secureId === '') {
+        $id = $entity->getId();
+        if (! is_string($id) || $id === '') {
             return;
         }
 
         $entityName = $this->normalizeName($entity::getEntityName());
-        $this->entities[$entityName][$secureId] = $entity;
+        $this->entities[$entityName][$id] = $entity;
 
-        $waiting = $this->stubs[$entityName][$secureId] ?? null;
+        $waiting = $this->stubs[$entityName][$id] ?? null;
         if (! is_array($waiting)) {
             return;
         }
@@ -42,36 +42,36 @@ class ApiEntityRegistry
             $owner->replaceRelationship($entry['stub'], $entity);
         }
 
-        unset($this->stubs[$entityName][$secureId]);
+        unset($this->stubs[$entityName][$id]);
     }
 
     public function registerStub(AbstractApiEntity $owner, ApiEntityStub $stub): void
     {
-        $secureId = $stub->getSecureId();
-        if (! is_string($secureId) || $secureId === '') {
+        $id = $stub->getId();
+        if (! is_string($id) || $id === '') {
             return;
         }
 
         $entityName = $this->normalizeName($stub->getTargetName());
 
-        $existing = $this->entities[$entityName][$secureId] ?? null;
+        $existing = $this->entities[$entityName][$id] ?? null;
         if ($existing instanceof AbstractApiEntity) {
             $owner->replaceRelationship($stub, $existing);
 
             return;
         }
 
-        $this->stubs[$entityName][$secureId][] = [
+        $this->stubs[$entityName][$id][] = [
             'owner' => WeakReference::create($owner),
             'stub' => $stub,
         ];
     }
 
-    public function resolve(string $entityName, string $secureId): ?AbstractApiEntity
+    public function resolve(string $entityName, string $id): ?AbstractApiEntity
     {
         $entityName = $this->normalizeName($entityName);
 
-        return $this->entities[$entityName][$secureId] ?? null;
+        return $this->entities[$entityName][$id] ?? null;
     }
 
     private function normalizeName(string $name): string

@@ -300,14 +300,14 @@ abstract class AbstractApiRepository
         array $data,
         array $schema
     ): void {
-        SchemaHelper::assertAllowedFields($data, $schema, ['secureId']);
+        SchemaHelper::assertAllowedFields($data, $schema, ['id']);
     }
 
     protected function hydrateEntityIdentifier(
         AbstractApiEntity $entity,
         array $data
     ): void {
-        $this->assignPropertyValue($entity, 'secureId', (string) $data['secureId']);
+        $this->assignPropertyValue($entity, 'id', (string) $data['id']);
     }
 
     protected function assignPropertyValue(

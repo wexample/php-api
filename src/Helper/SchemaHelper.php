@@ -17,7 +17,7 @@ final class SchemaHelper
     public static function assertAllowedFields(
         array $data,
         array $schema,
-        array $extraAllowed = ['secureId']
+        array $extraAllowed = ['id']
     ): void {
         $allowed = $extraAllowed;
         $entityName = self::getSchemaName($schema);

@@ -14,7 +14,7 @@ abstract class AbstractApiEntity
     use HasSnakeShortClassNameClassTrait;
 
     public function __construct(
-        protected ?string $secureId = null,
+        protected ?string $id = null,
         protected array $metadata = [],
         protected array $relationships = [],
         protected array $values = [],
@@ -46,9 +46,9 @@ abstract class AbstractApiEntity
         return static::class;
     }
 
-    public function getSecureId(): ?string
+    public function getId(): ?string
     {
-        return $this->secureId;
+        return $this->id;
     }
 
     public function getMetadata(): array
@@ -101,7 +101,7 @@ abstract class AbstractApiEntity
 
             if ($relationship instanceof ApiEntityStub) {
                 if (
-                    $relationship->getSecureId() === $stub->getSecureId()
+                    $relationship->getId() === $stub->getId()
                     && $this->normalizeRelationshipName($relationship->getTargetName())
                         === $this->normalizeRelationshipName($stub->getTargetName())
                 ) {

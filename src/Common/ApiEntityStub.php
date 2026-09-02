@@ -8,10 +8,10 @@ class ApiEntityStub extends AbstractApiEntity
 {
     public function __construct(
         protected string $targetName,
-        ?string $secureId,
+        ?string $id,
     ) {
         parent::__construct(
-            secureId: $secureId
+            id: $id
         );
     }
 
@@ -19,7 +19,7 @@ class ApiEntityStub extends AbstractApiEntity
     {
         return new self(
             targetName: (string) ($data['entityName'] ?? $data['target'] ?? ''),
-            secureId: isset($data['secureId']) ? (string) $data['secureId'] : null
+            id: isset($data['id']) ? (string) $data['id'] : null
         );
     }
 
