@@ -1,6 +1,6 @@
 # php_api
 
-Version: 4.0.1
+Version: 4.0.2
 
 `wexample/php-api` is a PHP client library for talking to JSON APIs: a Guzzle-backed `Client` that prefixes a base URL, sends a `Authorization: Bearer` header on every call, and turns any response with a status of 400 or more into an `ApiException` carrying the decoded body. On top of it, src/Common/AbstractApiEntitiesClient.php adds an entity layer — repositories that unwrap the `{type, code, message?, data}` envelope produced by `wexample/symfony-api` controllers, check each item against the entity schema the client exposes, and return hydrated `AbstractApiEntity` objects with their relationships resolved instead of nested arrays.
 
