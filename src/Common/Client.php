@@ -21,10 +21,10 @@ use Wexample\PhpApi\Enum\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiException;
 
 /**
- * Minimal  API client built on top of Guzzle.
+ * Generic JSON API client built on top of Guzzle, for any remote service.
  *
  * @example
- * $client = new Client('https://api.wexample.com', 'api-key-here');
+ * $client = new Client('https://api.example.com', 'api-key-here', options: new ClientOptions(timeout: 30));
  * $response = $client->get('/v1/things', ['query' => ['page' => 1]]);
  */
 class Client
@@ -35,11 +35,18 @@ class Client
      */
     public const string USER_AGENT = 'wexample-php-api';
 
+    /**
+     * Path requested by checkConnection(), relative to the base URL.
+     */
+    public const string PING_PATH = '';
+
     private ClientInterface $httpClient;
     private string $baseUrl;
+    private ClientOptions $options;
+    private ?float $lastRequestAt = null;
 
     /**
-     * @param string $baseUrl Base URL for the  API, e.g. https://api.syrtis.ai.
+     * @param string $baseUrl Base URL of the API, e.g. https://api.example.com.
      * @param string|null $apiKey Optional API key for Bearer authentication.
      * @param ClientInterface|null $httpClient Custom HTTP client instance (defaults to Guzzle).
      * @param array<string, string> $defaultHeaders Extra headers sent with every request.
@@ -49,8 +56,10 @@ class Client
         public readonly ?string $apiKey = null,
         ?ClientInterface $httpClient = null,
         private array $defaultHeaders = [],
+        ?ClientOptions $options = null,
     ) {
         $this->baseUrl = rtrim($baseUrl, '/') . '/';
+        $this->options = $options ?? new ClientOptions();
 
         $this->httpClient = $httpClient ?? new GuzzleClient([
             'base_uri' => $this->baseUrl,
@@ -69,6 +78,26 @@ class Client
     public function getBaseUrl(): string
     {
         return $this->baseUrl;
+    }
+
+    public function getOptions(): ClientOptions
+    {
+        return $this->options;
+    }
+
+    /**
+     * Whether the remote answers PING_PATH without an error status. A failure
+     * of any kind is the answer, not an error: callers use it for health checks.
+     */
+    public function checkConnection(): bool
+    {
+        try {
+            $this->request(HttpMethod::GET, static::PING_PATH);
+        } catch (ApiException) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -177,7 +206,8 @@ class Client
     }
 
     /**
-     * Sends an HTTP request using the underlying client.
+     * Sends an HTTP request using the underlying client, retrying transient
+     * failures of idempotent methods as ClientOptions allows.
      *
      * @param array<string, mixed> $options Request options accepted by Guzzle.
      *
@@ -185,23 +215,40 @@ class Client
      */
     public function request(HttpMethod|string $method, string $path, array $options = []): ResponseInterface
     {
-        $options['headers'] = $this->buildHeaders($options['headers'] ?? []);
+        $method = HttpMethod::toValue($method);
+        $options = $this->buildRequestOptions($options);
+        $uri = ltrim($path, '/');
+        // A method outside the enum (WebDAV, custom verbs) is never assumed idempotent.
+        $retries = HttpMethod::tryFrom($method)?->isIdempotent() ? $this->options->retries : 0;
 
-        if (isset($options['multipart'])) {
-            // Let Guzzle generate the multipart boundary: a forced
-            // Content-Type (e.g. a default application/json header) would
-            // corrupt the request body declaration.
-            foreach (array_keys($options['headers']) as $name) {
-                if (strtolower($name) === 'content-type') {
-                    unset($options['headers'][$name]);
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return $this->send($method, $uri, $options);
+            } catch (ApiException $exception) {
+                if ($attempt >= $retries || ! $exception->isTransient()) {
+                    throw $exception;
                 }
+
+                $this->pause($this->options->retryDelay * (2 ** $attempt));
             }
         }
+    }
 
-        $uri = ltrim($path, '/');
+    /**
+     * Sleeps between attempts and to honour the rate limit; overridden by
+     * tests to observe the delays without waiting.
+     */
+    protected function pause(float $seconds): void
+    {
+        usleep((int) round($seconds * 1_000_000));
+    }
+
+    private function send(string $method, string $uri, array $options): ResponseInterface
+    {
+        $this->waitForRateLimit();
 
         try {
-            $response = $this->httpClient->request(HttpMethod::toValue($method), $uri, $options);
+            $response = $this->httpClient->request($method, $uri, $options);
         } catch (GuzzleException $exception) {
             if (
                 $exception instanceof \GuzzleHttp\Exception\RequestException
@@ -218,6 +265,52 @@ class Client
         }
 
         return $response;
+    }
+
+    private function waitForRateLimit(): void
+    {
+        $now = microtime(true);
+
+        if ($this->lastRequestAt !== null) {
+            $wait = $this->options->rateLimitDelay - ($now - $this->lastRequestAt);
+
+            if ($wait > 0) {
+                $this->pause($wait);
+                $now += $wait;
+            }
+        }
+
+        $this->lastRequestAt = $now;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private function buildRequestOptions(array $options): array
+    {
+        $options['headers'] = $this->buildHeaders($options['headers'] ?? []);
+
+        if ($this->options->timeout > 0) {
+            $options['timeout'] ??= $this->options->timeout;
+        }
+
+        if ($this->options->connectTimeout > 0) {
+            $options['connect_timeout'] ??= $this->options->connectTimeout;
+        }
+
+        if (isset($options['multipart'])) {
+            // Let Guzzle generate the multipart boundary: a forced
+            // Content-Type (e.g. a default application/json header) would
+            // corrupt the request body declaration.
+            foreach (array_keys($options['headers']) as $name) {
+                if (strtolower($name) === 'content-type') {
+                    unset($options['headers'][$name]);
+                }
+            }
+        }
+
+        return $options;
     }
 
     /**

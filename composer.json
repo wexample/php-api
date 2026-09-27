@@ -1,6 +1,6 @@
 {
   "name": "wexample/php-api",
-  "description": "Various api",
+  "description": "Generic JSON API client for PHP, built on Guzzle",
   "type": "library",
   "license": "MIT",
   "version": "4.0.2",
@@ -13,8 +13,7 @@
   "minimum-stability": "stable",
   "require": {
     "php": ">=8.5",
-    "guzzlehttp/guzzle": "^7.8",
-    "wexample/php-helpers": ">=4.0.0"
+    "guzzlehttp/guzzle": "^7.8"
   },
   "require-dev": {
     "phpunit/phpunit": "^9.5"
