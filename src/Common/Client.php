@@ -9,6 +9,7 @@ use function array_merge;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use JsonException;
 
 use function ltrim;
 
@@ -49,10 +50,12 @@ class Client
             'base_uri' => $this->baseUrl,
         ]);
 
-        $this->setApiKey($apiKey);
+        if ($apiKey !== null) {
+            $this->setApiKey($apiKey);
+        }
     }
 
-    public function setApiKey(string $apiKey)
+    public function setApiKey(string $apiKey): void
     {
         $this->setBearerToken($apiKey);
     }
