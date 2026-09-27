@@ -46,3 +46,4 @@ coverage*.lcov
 /dist/
 /out/
 /coverage/
+.phpunit.result.cache

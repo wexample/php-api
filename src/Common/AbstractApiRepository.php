@@ -7,7 +7,7 @@ namespace Wexample\PhpApi\Common;
 use InvalidArgumentException;
 use Wexample\Helpers\Helper\ClassHelper;
 use Wexample\Helpers\Helper\TextHelper;
-use Wexample\PhpApi\Const\HttpMethod;
+use Wexample\PhpApi\Enum\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiEnvelopeException;
 use Wexample\PhpApi\Exceptions\ApiSchemaException;
 use Wexample\PhpApi\Helper\ApiEnvelopeHelper;

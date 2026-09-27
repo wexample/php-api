@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Wexample\PhpApi\Common;
 
-use Wexample\PhpApi\Const\HttpMethod;
+use Wexample\PhpApi\Enum\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiException;
 
 abstract class AbstractApiClient extends Client
 {
     protected bool $debugEnabled = false;
 
-    public function requestJson(string $method, string $path, array $options = []): array
+    public function requestJson(HttpMethod|string $method, string $path, array $options = []): array
     {
+        $method = HttpMethod::toValue($method);
+
         try {
             return parent::requestJson($method, $path, $options);
         } catch (ApiException $exception) {
@@ -153,8 +155,6 @@ abstract class AbstractApiClient extends Client
             $encoded = json_encode($debugPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             echo $encoded !== false ? $encoded : var_export($debugPayload, true);
         }
-
-        exit(1);
     }
 
     protected function buildFullUrl(string $path): string

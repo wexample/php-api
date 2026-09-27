@@ -17,7 +17,7 @@ use Psr\Http\Message\ResponseInterface;
 
 use function rtrim;
 
-use Wexample\PhpApi\Const\HttpMethod;
+use Wexample\PhpApi\Enum\HttpMethod;
 use Wexample\PhpApi\Exceptions\ApiException;
 
 /**
@@ -29,6 +29,12 @@ use Wexample\PhpApi\Exceptions\ApiException;
  */
 class Client
 {
+    /**
+     * Sent unless a default or per-request header overrides it; subclasses
+     * redefine the constant to identify themselves.
+     */
+    public const string USER_AGENT = 'wexample-php-api';
+
     private ClientInterface $httpClient;
     private string $baseUrl;
 
@@ -98,7 +104,7 @@ class Client
         $this->setDefaultHeader('Authorization', 'Bearer ' . $token);
     }
 
-    protected function requestJson(string $method, string $path, array $options = []): array
+    protected function requestJson(HttpMethod|string $method, string $path, array $options = []): array
     {
         $response = $this->request($method, $path, $options);
 
@@ -107,14 +113,14 @@ class Client
         try {
             $data = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new \Wexample\PhpApi\Exceptions\ApiException(
+            throw new ApiException(
                 'Invalid JSON response: ' . $e->getMessage(),
                 previous: $e
             );
         }
 
         if (! is_array($data)) {
-            throw new \Wexample\PhpApi\Exceptions\ApiException('Unexpected JSON response shape (expected object/array).');
+            throw new ApiException('Unexpected JSON response shape (expected object/array).');
         }
 
         return $data;
@@ -177,7 +183,7 @@ class Client
      *
      * @throws ApiException When transport fails or the API replies with an error status.
      */
-    public function request(string $method, string $path, array $options = []): ResponseInterface
+    public function request(HttpMethod|string $method, string $path, array $options = []): ResponseInterface
     {
         $options['headers'] = $this->buildHeaders($options['headers'] ?? []);
 
@@ -195,7 +201,7 @@ class Client
         $uri = ltrim($path, '/');
 
         try {
-            $response = $this->httpClient->request($method, $uri, $options);
+            $response = $this->httpClient->request(HttpMethod::toValue($method), $uri, $options);
         } catch (GuzzleException $exception) {
             if (
                 $exception instanceof \GuzzleHttp\Exception\RequestException
@@ -204,7 +210,7 @@ class Client
                 throw ApiException::fromResponse($exception->getResponse(), $exception);
             }
 
-            throw new ApiException('HTTP request failed: ' . $exception->getMessage(), previous: $exception);
+            throw ApiException::fromTransportFailure($exception);
         }
 
         if ($response->getStatusCode() >= 400) {
@@ -222,7 +228,7 @@ class Client
     {
         return array_merge(
             [
-                'User-Agent' => 'syrtis-client-php/0.1',
+                'User-Agent' => static::USER_AGENT,
                 'Accept' => 'application/json',
             ],
             $this->defaultHeaders,
