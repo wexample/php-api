@@ -1,7 +1,8 @@
 # wexample/php-api
 
-Version: 1.0.97
-
-Various api
+Generic JSON API client for PHP, built on Guzzle.
 
 ## Table of Contents
+
+
+

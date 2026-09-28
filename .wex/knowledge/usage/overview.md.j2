@@ -1,3 +1,14 @@
-`wexample/php-api` is a PHP client library for talking to JSON APIs: a Guzzle-backed `Client` that prefixes a base URL, sends a `Authorization: Bearer` header on every call, and turns any response with a status of 400 or more into an `ApiException` carrying the decoded body. On top of it, {{ path("src/Common/AbstractApiEntitiesClient.php") }} adds an entity layer — repositories that unwrap the `{type, code, message?, data}` envelope produced by `wexample/symfony-api` controllers, check each item against the entity schema the client exposes, and return hydrated `AbstractApiEntity` objects with their relationships resolved instead of nested arrays.
+`wexample/php-api` is a generic PHP client for any JSON API: a Guzzle-backed `Client` that prefixes a base URL, sends an optional `Authorization: Bearer` header, and turns any response with a status of 400 or more — or a request that never got one — into an `ApiException` that says whether retrying may help (`isTransient()`). {{ path("src/Common/ClientOptions.php") }} adds the transport policy shared with the Python `wexample_api` gateway and the TypeScript `@wexample/js-api` client: timeouts, retries of idempotent requests, a minimum delay between requests, and `checkConnection()` for health checks.
 
-It is for PHP applications consuming a Wexample-style API, whether they only need the plain HTTP verbs and multipart uploads of {{ path("src/Common/AbstractApiClient.php") }} or the full schema-driven entity mapping.
+It knows nothing about the remote's payloads. Clients of APIs served by `wexample/symfony-api` — envelope `{type, code, data}`, entity schemas, repositories — build on `wexample/php-api-entity`, which extends this package; a client for a third-party service (Rocket.Chat, Stripe, …) extends {{ path("src/Common/AbstractApiClient.php") }} directly.
+
+```php
+$client = new Client(
+    'https://api.example.com',
+    'api-key',
+    options: new ClientOptions(timeout: 30, retries: 2, rateLimitDelay: 0.5),
+);
+
+$client->checkConnection();                       // bool, never throws
+$response = $client->get('v1/things', ['query' => ['page' => 1]]);
+```
