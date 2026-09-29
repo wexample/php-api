@@ -3,7 +3,7 @@
   "description": "Generic JSON API client for PHP, built on Guzzle",
   "type": "library",
   "license": "MIT",
-  "version": "4.0.2",
+  "version": "5.0.0",
   "authors": [
     {
       "name": "Wexample",

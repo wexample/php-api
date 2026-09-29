@@ -1,10 +1,21 @@
 # php_api
 
-Version: 4.0.2
+Version: 5.0.0
 
-`wexample/php-api` is a PHP client library for talking to JSON APIs: a Guzzle-backed `Client` that prefixes a base URL, sends a `Authorization: Bearer` header on every call, and turns any response with a status of 400 or more into an `ApiException` carrying the decoded body. On top of it, src/Common/AbstractApiEntitiesClient.php adds an entity layer — repositories that unwrap the `{type, code, message?, data}` envelope produced by `wexample/symfony-api` controllers, check each item against the entity schema the client exposes, and return hydrated `AbstractApiEntity` objects with their relationships resolved instead of nested arrays.
+`wexample/php-api` is a generic PHP client for any JSON API: a Guzzle-backed `Client` that prefixes a base URL, sends an optional `Authorization: Bearer` header, and turns any response with a status of 400 or more — or a request that never got one — into an `ApiException` that says whether retrying may help (`isTransient()`). src/Common/ClientOptions.php adds the transport policy shared with the Python `wexample_api` gateway and the TypeScript `@wexample/js-api` client: timeouts, retries of idempotent requests, a minimum delay between requests, and `checkConnection()` for health checks.
 
-It is for PHP applications consuming a Wexample-style API, whether they only need the plain HTTP verbs and multipart uploads of src/Common/AbstractApiClient.php or the full schema-driven entity mapping.
+It knows nothing about the remote's payloads. Clients of APIs served by `wexample/symfony-api` — envelope `{type, code, data}`, entity schemas, repositories — build on `wexample/php-api-entity`, which extends this package; a client for a third-party service (Rocket.Chat, Stripe, …) extends src/Common/AbstractApiClient.php directly.
+
+```php
+$client = new Client(
+    'https://api.example.com',
+    'api-key',
+    options: new ClientOptions(timeout: 30, retries: 2, rateLimitDelay: 0.5),
+);
+
+$client->checkConnection();                       // bool, never throws
+$response = $client->get('v1/things', ['query' => ['page' => 1]]);
+```
 
 ## Table of Contents
 
@@ -18,62 +29,41 @@ It is for PHP applications consuming a Wexample-style API, whether they only nee
 
 ## Architecture
 
-The package is one inheritance chain of three client classes plus an entity layer hanging off the last of them. Everything lives under `Wexample\PhpApi\` (PSR-4 on `src/`, declared in composer.json), split into `Common/` (the classes an application extends), `Helper/` (stateless parsing), `Exceptions/` and `Const/`.
+Two client classes, one options object, one exception. Everything lives under `Wexample\PhpApi\` (PSR-4 on `src/`, declared in composer.json): `Common/` holds the classes an application builds on, `Enum/` the HTTP method, `Exceptions/` the error. The only runtime dependency is `guzzlehttp/guzzle`; Symfony's `VarDumper` is probed with `class_exists()` and stays optional.
 
-### The three client layers
+The entity layer that used to live here — repositories, schemas, the `{type, code, data}` envelope — moved to `wexample/php-api-entity`, whose `AbstractApiEntitiesClient` extends `AbstractApiClient`. Nothing in this package knows the shape of a response body.
 
-src/Common/Client.php is the transport. It normalises the base URL (`$this->baseUrl = rtrim($baseUrl, '/') . '/'`), builds a Guzzle client on it unless one is injected, keeps a mutable `$defaultHeaders` map — `setBearerToken()` writes `Authorization: Bearer …` into it — and exposes `get/post/put/patch/delete`, all forwarding to `request()`. That single method merges `User-Agent` and `Accept: application/json` under the default headers under the per-call headers, strips any `content-type` when `$options['multipart']` is set so Guzzle can generate its own boundary, and converts failure into `ApiException`: a `RequestException` carrying a response and any status `>= 400` both go through `ApiException::fromResponse()`.
+### The path of a request
 
-src/Common/AbstractApiClient.php adds the JSON and file concerns. It widens `requestJson()` to public and wraps it in an optional debug trap: when `setDebugEnabled(true)` and the exception code is outside the 4xx range, `dumpApiException()` prints endpoint, payload, decoded response and a ready-to-paste `curl -i -X …` line — via `VarDumper` if Symfony's is installed, plain JSON otherwise — then `exit(1)`. `requestFormDataFromJson()` is the upload convention: one multipart part named `data` holding `json_encode($data)`, then the files as `upload_0`, `upload_1`, … each accepted as a path, an `SplFileInfo`, an open resource or a raw Guzzle part.
+`$client->get('things')` goes through src/Common/Client.php:
 
-src/Common/AbstractApiEntitiesClient.php is the entity entry point. Its constructor instantiates an `ApiEntityManager` from `$this->getRepositoryClasses()` — the one abstract method a concrete client must implement — and a fresh `ApiEntityRegistry`. `getRepository($entity)` delegates to the manager and accepts either an entity name or an `AbstractApiEntity` class-string.
+1. `request()` normalizes the method with `HttpMethod::toValue()`, so both the enum and a raw string (`'delete'`, `'PROPFIND'`) are accepted.
+2. `buildRequestOptions()` merges headers — `User-Agent` from `static::USER_AGENT` and `Accept: application/json`, under the client's default headers, under the per-call ones — adds `timeout` and `connect_timeout` from `ClientOptions` unless the call sets its own, and drops any `content-type` when `multipart` is set so Guzzle writes its own boundary.
+3. `send()` first waits for the rate limit (`waitForRateLimit()`: the gap since the previous request is topped up to `rateLimitDelay`), then calls Guzzle. A `RequestException` carrying a response and any status `>= 400` become `ApiException::fromResponse()`; a failure with no response (connection refused, DNS, timeout) becomes `ApiException::fromTransportFailure()`.
+4. Back in `request()`, a transient `ApiException` is retried up to `retries` times, waiting `retryDelay` seconds doubled at each attempt — only for idempotent methods (`HttpMethod::isIdempotent()`: everything but POST and PATCH), since a retried POST could apply twice on the remote. A method outside the enum is never retried.
 
-### The entity layer
+Every wait goes through the protected `pause()`, which tests override to record delays instead of sleeping.
 
-src/Common/ApiEntityManager.php owns the entity-name → repository table. At construction it calls `$repositoryClass::getEntityType()` on each declared repository, refuses anything not extending `AbstractApiEntity`, and indexes by `$entityType::getEntityName()`. Repositories are built lazily on first `get()`; an unknown name throws `InvalidArgumentException` listing the registered ones.
+### Options
 
-src/Common/AbstractApiRepository.php is where nearly all the logic sits: route building, envelope unwrapping, schema validation, hydration and relationship resolution. Each concrete repository only declares `public static function getEntityType(): string`. Routes come from `buildPath()`, which kebab-cases the entity name — `TextHelper::toKebab(static::getEntityName())` — so `fetch()` hits `foo-bar/show/<id>` and `fetchList()` hits `foo-bar/list`.
+src/Common/ClientOptions.php is a readonly value object passed as the constructor's last argument. Its fields mirror the Python `AbstractGateway` (`timeout`, `rate_limit_delay`, `retries`) and `@wexample/js-api`'s `ApiClientOptions`; every duration is in seconds. Defaults keep the historical behaviour — no timeout, no retry, no pacing — so existing clients are unchanged until they opt in. The options apply to the injected Guzzle client as well, since they are enforced in `Client` rather than in a Guzzle middleware.
 
-src/Common/AbstractApiEntity.php is deliberately thin: a `secureId`, plus `metadata`, `relationships`, `values` and `relationshipMap` arrays. `fromArray()` returns `new static()` with nothing populated — the repository fills the object afterwards. Reads go through `__get()` and `__call()`, which look in `values`, then `relationshipMap`, then the relationship list matched by name; `set*()` writes into `values`. Consequence for anyone adding an entity: typed properties are optional, and an entity declaring none still answers `$entity->getTitle()`.
+`checkConnection()` requests `static::PING_PATH` (empty by default: the base URL) and answers a boolean; a subclass points it at the remote's health route.
 
-### The path of a call
+### JSON and debugging
 
-`$client->getRepository(Article::class)->fetch('abc')` goes:
+`Client::requestJson()` decodes the body with `JSON_THROW_ON_ERROR` and requires an array; both failures become `ApiException`. src/Common/AbstractApiClient.php makes it public and adds two concerns:
 
-1. `ApiEntityManager::get()` resolves the name and lazily constructs the repository with the client.
-2. `AbstractApiRepository::fetch()` builds `article/show/abc` (`rawurlencode` on the identifier) and calls `$this->client->requestJson(HttpMethod::GET, …)`.
-3. `Client::request()` sends it; a `>= 400` status becomes `ApiException`, then the body is decoded and required to be an array.
-4. `extractPayload()` hands the decoded response to `ApiEnvelopeHelper::unwrap()`, which throws `ApiEnvelopeException` on `type === 'error'` (message = the server error key, e.g. `ERR_INVALID_CREDENTIALS`) or on a missing `data` key, and returns `$response['data']` otherwise. `fetchList()` adds `extractItems()`, requiring an `items` array inside that payload.
-5. `hydrateFromApiItem()` splits the item into `[entity, metadata, relationships]`, rejecting anything without a string `type` and an `entity` object, then `assertApiItemType()` checks `$item['type']` equals this repository's entity name.
-6. `createFromApiItem()` hydrates: `fromArray()`, schema lookup, `validateExtraFields()`, `hydrateEntityFields()`, `hydrateEntityIdentifier()`, `setMetadata()`, registration in the registry, then `setRelationships()`.
-
-### Schema-driven hydration
-
-The schema is not stored in this package. `getEntitySchemas()` calls the same method on the client, guarded by `method_exists()` — the abstract client never declares it, so a concrete client missing `getEntitySchemas()` fails at hydration time with `Client must implement getEntitySchemas() to hydrate relationships.` The same holds for `getEntityRegistry()`. A schema is an array keyed by entity name, each holding `properties` entries of `{name, type, nullable, target}`.
-
-Hydration is strict in both directions. `SchemaHelper::assertAllowedFields()` throws on any field the schema does not declare (only `secureId` is whitelisted), and `hydrateEntityFields()` throws `ApiSchemaException::nonNullableNull()` when a non-nullable property arrives as `null`. Values pass through `SchemaHelper::normalizeValue()`, which casts by declared type and turns `datetime` into a `DateTimeImmutable`. Assignment tries the real property first via reflection (`setAccessible(true)`), then the generated setter, then gives up with `ApiSchemaException::propertyNotFound()`.
-
-### Relationships and stubs
-
-`buildRelationshipsForEntity()` walks the schema for properties typed `relation` (one linked entity) or `collection` (many) and resolves each value in `resolveRelationshipEntity()`:
-
-- an inline array is hydrated by the target's own repository, recursively;
-- a string found as a key in the item's `relationships` side-load is hydrated the same way;
-- a bare string id becomes an `ApiEntityStub` — an `AbstractApiEntity` with `isStub() === true` and a `targetName`.
-
-Stubs are how cycles and forward references stay cheap. src/Common/ApiEntityRegistry.php indexes hydrated entities by snake-cased entity name and `secureId`; `registerStub()` swaps the stub immediately if the real entity is already known, otherwise queues it under a `WeakReference` to the owner, and the next `registerEntity()` with that id calls `$owner->replaceRelationship($stub, $entity)` on everyone waiting. The weak reference is what keeps the registry from pinning entities in memory. Note the registry is per-client and never cleared: it lives as long as the client instance.
-
-Relationships are stored twice — a flat list in `relationships` and a `relationshipMap` keyed by property name — which is why `$article->author` returns a single entity for a `relation` and an array for a `collection`.
+- a debug trap: with `setDebugEnabled(true)`, an exception outside the 4xx range is dumped — endpoint, payload, decoded response and a ready-to-paste `curl -i -X …` line — through `VarDumper` when present, as JSON otherwise, then rethrown;
+- `requestFormDataFromJson()`, the upload convention shared with `@wexample/js-api`: a multipart part named `data` holding the JSON payload, then the files as `upload_0`, `upload_1`, … each given as a path, an `SplFileInfo`, an open resource or a raw Guzzle part.
 
 ### Errors
 
-Three unrelated exception types, by origin: `ApiException` for transport and HTTP status (carries `getResponseBody()` and `getResponseData()`), `ApiEnvelopeException` for a malformed or `type: error` envelope (carries `getResponseCode()` and the full `getEnvelope()`), `ApiSchemaException` for anything that fails hydration. Only the last has a stable error vocabulary — `CODE_UNKNOWN_FIELD`, `CODE_PROPERTY_NOT_FOUND`, `CODE_NON_NULLABLE_NULL`, `CODE_INVALID_VALUE`, `CODE_INVALID_ITEM`, `CODE_UNKNOWN_RELATIONSHIP` — exposed through `getErrorCode()`, with a private constructor and named factories that always report the owning entity and field. Its docblock states the intent: a schema exception means the API contract drifted, and the client is not meant to tolerate it.
+src/Exceptions/ApiException.php is the only exception. Its code is the HTTP status (0 when no response came back); `getResponseBody()` and `getResponseData()` expose the raw and decoded body. `isTransient()` is the retry contract used by `Client` and by callers such as `symfony-data-sync`: true for a transport failure, any 5xx, 408, 425 and 429; false for other 4xx and for an unreadable response.
 
-One rough edge to know before editing `Client::requestJson()`: its `catch (JsonException $e)` is unqualified inside `namespace Wexample\PhpApi\Common` with no matching `use`, so it resolves to a class that does not exist and the `JSON_THROW_ON_ERROR` failure escapes uncaught.
+### HTTP methods
 
-### Dependencies
-
-composer.json requires only `php: >=7.4` and `guzzlehttp/guzzle: ^7.8` (PSR-7 interfaces arrive with it), yet the entity layer imports `Wexample\Helpers\Helper\ClassHelper`, `Wexample\Helpers\Helper\TextHelper` and `Wexample\Helpers\Class\Traits\HasSnakeShortClassNameClassTrait` — `wexample/helpers` must be on the autoloader for anything beyond the bare `Client`. Symfony's `VarDumper` is probed at runtime with `class_exists()` and is genuinely optional. The declared floor of PHP 7.4 is also below what the code uses: constructor property promotion, `match`, named arguments and typed class constants (`public const string CODE_UNKNOWN_FIELD`) put the real floor at PHP 8.3.
+src/Enum/HttpMethod.php is the backed enum every method accepts. src/Const/HttpMethod.php, the former class of string constants, is kept for callers not yet migrated and marked `@deprecated`: its values are plain strings, which every method still accepts.
 
 ## Integration in the Suite
 
@@ -89,7 +79,6 @@ Visit the [Wexample Suite documentation](https://docs.wexample.com) for the comp
 
 - php: >=8.5
 - guzzlehttp/guzzle: ^7.8
-- wexample/php-helpers: >=4.0.0
 
 ## Versioning & Compatibility Policy
 
