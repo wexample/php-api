@@ -1,6 +1,6 @@
 # php_api
 
-Version: 5.0.1
+Version: 5.0.2
 
 `wexample/php-api` is a generic PHP client for any JSON API: a Guzzle-backed `Client` that prefixes a base URL, sends an optional `Authorization: Bearer` header, and turns any response with a status of 400 or more — or a request that never got one — into an `ApiException` that says whether retrying may help (`isTransient()`). src/Common/ClientOptions.php adds the transport policy shared with the Python `wexample_api` gateway and the TypeScript `@wexample/js-api` client: timeouts, retries of idempotent requests, a minimum delay between requests, and `checkConnection()` for health checks.
 
